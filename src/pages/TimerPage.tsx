@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTimer } from "@/contexts/TimerContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Play, Pause, RotateCcw } from "lucide-react";
-import { toast } from "sonner";
-import { bumpStreak } from "@/lib/streaks";
 import { cn } from "@/lib/utils";
 
 const PRESETS = [
@@ -20,64 +19,22 @@ const PRESETS = [
 
 export default function TimerPage() {
   const { user } = useAuth();
+  const {
+    durationMin, selectedPreset, customMin, setCustomMin,
+    subjectId, setSubjectId, secondsLeft, running,
+    selectPreset, setSelectedPreset, applyCustom, toggleRunning, reset,
+  } = useTimer();
   const [subjects, setSubjects] = useState<any[]>([]);
-  const [subjectId, setSubjectId] = useState<string>("");
-  const [durationMin, setDurationMin] = useState(25);
-  const [selectedPreset, setSelectedPreset] = useState<string>("25m");
-  const [customMin, setCustomMin] = useState<string>("30");
-  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
-  const [running, setRunning] = useState(false);
-  const intRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
     supabase.from("subjects").select("*").eq("user_id", user.id).order("created_at")
-      .then(({ data }) => { setSubjects(data || []); if (data?.[0]) setSubjectId(data[0].id); });
-  }, [user]);
-
-  useEffect(() => {
-    if (!running) return;
-    intRef.current = window.setInterval(() => {
-      setSecondsLeft(s => {
-        if (s <= 1) { complete(); return durationMin * 60; }
-        return s - 1;
+      .then(({ data }) => {
+        setSubjects(data || []);
+        if (!subjectId && data?.[0]) setSubjectId(data[0].id);
       });
-    }, 1000);
-    return () => { if (intRef.current) window.clearInterval(intRef.current); };
     // eslint-disable-next-line
-  }, [running, durationMin]);
-
-  const selectPreset = (label: string, minutes: number) => {
-    setSelectedPreset(label);
-    setDurationMin(minutes);
-    setSecondsLeft(minutes * 60);
-    setRunning(false);
-  };
-
-  const applyCustom = () => {
-    const n = parseInt(customMin, 10);
-    if (!n || n <= 0 || n > 600) {
-      toast.error("Enter a valid duration (1-600 minutes)");
-      return;
-    }
-    setSelectedPreset("Custom");
-    setDurationMin(n);
-    setSecondsLeft(n * 60);
-    setRunning(false);
-  };
-
-  const complete = async () => {
-    setRunning(false);
-    if (intRef.current) window.clearInterval(intRef.current);
-    if (!user) return;
-    await supabase.from("study_sessions").insert({
-      user_id: user.id, subject_id: subjectId || null, duration_minutes: durationMin,
-    });
-    const newStreak = await bumpStreak(user.id);
-    toast.success("🍅 Focus session complete!", { description: `+${durationMin} min logged · ${newStreak} day streak` });
-  };
-
-  const reset = () => { setRunning(false); setSecondsLeft(durationMin * 60); };
+  }, [user]);
 
   const mins = Math.floor(secondsLeft / 60).toString().padStart(2, "0");
   const secs = (secondsLeft % 60).toString().padStart(2, "0");
@@ -159,7 +116,7 @@ export default function TimerPage() {
           </Select>
 
           <div className="flex gap-2">
-            <Button size="lg" className="flex-1" onClick={() => setRunning(r => !r)}>
+            <Button size="lg" className="flex-1" onClick={toggleRunning}>
               {running ? <><Pause className="w-4 h-4 mr-2" />Pause</> : <><Play className="w-4 h-4 mr-2" />{secondsLeft === durationMin * 60 ? "Start" : "Resume"}</>}
             </Button>
             <Button size="lg" variant="outline" onClick={reset}><RotateCcw className="w-4 h-4" /></Button>
