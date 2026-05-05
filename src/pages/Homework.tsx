@@ -35,6 +35,10 @@ export default function Homework() {
   useEffect(() => { load(); }, [user]);
 
   const active = items.filter(i => !i.completed);
+  const sorted = [...items].sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+  });
 
   const add = async () => {
     if (!user || !form.title) return;
@@ -45,8 +49,14 @@ export default function Homework() {
     setShow(false); load();
   };
 
-  const toggle = async (id: string, v: boolean) => { await supabase.from("homework").update({ completed: v }).eq("id", id); load(); };
+  const toggle = async (id: string, v: boolean) => {
+    const { error } = await supabase.from("homework").update({ completed: v }).eq("id", id);
+    if (error) return toast.error(error.message);
+    if (v) toast.success("Homework completed! 🎉");
+    load();
+  };
   const del = async (id: string) => { await supabase.from("homework").delete().eq("id", id); load(); };
+
 
   return (
     <div className="space-y-6">
@@ -78,7 +88,7 @@ export default function Homework() {
       <Card className="p-5 bg-gradient-card border-border">
         {items.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">No homework yet.</p> : (
           <div className="space-y-2">
-            {items.map(h => (
+            {sorted.map(h => (
               <div key={h.id} className={`flex items-start gap-3 p-3 rounded-lg bg-secondary/40 ${h.completed ? "opacity-50" : ""}`}>
                 <Checkbox checked={h.completed} onCheckedChange={v => toggle(h.id, !!v)} className="mt-1" />
                 <div className="w-1 h-8 rounded-full mt-1" style={{ background: h.subjects?.color || "#7c6ff7" }} />
