@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      battles: {
+        Row: {
+          challenger_id: string
+          challenger_minutes: number
+          created_at: string
+          duration_minutes: number
+          ended_at: string | null
+          id: string
+          opponent_id: string | null
+          opponent_minutes: number
+          started_at: string | null
+          status: string
+          subject_id: string | null
+          winner_id: string | null
+        }
+        Insert: {
+          challenger_id: string
+          challenger_minutes?: number
+          created_at?: string
+          duration_minutes?: number
+          ended_at?: string | null
+          id?: string
+          opponent_id?: string | null
+          opponent_minutes?: number
+          started_at?: string | null
+          status?: string
+          subject_id?: string | null
+          winner_id?: string | null
+        }
+        Update: {
+          challenger_id?: string
+          challenger_minutes?: number
+          created_at?: string
+          duration_minutes?: number
+          ended_at?: string | null
+          id?: string
+          opponent_id?: string | null
+          opponent_minutes?: number
+          started_at?: string | null
+          status?: string
+          subject_id?: string | null
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battles_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exams: {
         Row: {
           created_at: string
@@ -45,6 +98,85 @@ export type Database = {
             columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flashcard_decks: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          subject_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          subject_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          subject_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flashcard_decks_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flashcards: {
+        Row: {
+          back: string
+          created_at: string
+          deck_id: string
+          ease_score: number
+          front: string
+          id: string
+          last_reviewed_at: string | null
+          user_id: string
+        }
+        Insert: {
+          back: string
+          created_at?: string
+          deck_id: string
+          ease_score?: number
+          front: string
+          id?: string
+          last_reviewed_at?: string | null
+          user_id: string
+        }
+        Update: {
+          back?: string
+          created_at?: string
+          deck_id?: string
+          ease_score?: number
+          front?: string
+          id?: string
+          last_reviewed_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flashcards_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "flashcard_decks"
             referencedColumns: ["id"]
           },
         ]
