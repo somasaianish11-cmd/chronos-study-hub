@@ -77,7 +77,9 @@ export default function Exams() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map(e => {
-            const days = Math.ceil((new Date(e.exam_date).getTime() - Date.now()) / 86400000);
+            const examLocal = new Date(e.exam_date + "T00:00:00");
+            const todayLocal = new Date(new Date().setHours(0, 0, 0, 0));
+            const days = Math.ceil((examLocal.getTime() - todayLocal.getTime()) / 86400000);
             const urgent = days <= 7;
             return (
               <Card key={e.id} className={`p-5 bg-gradient-card border-border relative overflow-hidden ${urgent ? "border-accent/50" : ""}`}>
@@ -91,7 +93,7 @@ export default function Exams() {
                 </div>
                 <div className="mt-4">
                   <div className={`text-4xl font-bold tabular-nums ${urgent ? "text-accent" : "text-gradient"}`}>{days}</div>
-                  <div className="text-xs text-muted-foreground">{days === 1 ? "day" : "days"} away · {format(new Date(e.exam_date), "EEE, MMM d")}</div>
+                  <div className="text-xs text-muted-foreground">{days === 1 ? "day" : "days"} away · {format(new Date(e.exam_date + "T00:00:00"), "EEE, MMM d")}</div>
                 </div>
               </Card>
             );
