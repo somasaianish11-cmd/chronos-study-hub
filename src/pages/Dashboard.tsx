@@ -51,7 +51,7 @@ export default function Dashboard() {
     })();
   }, [user]);
 
-  const daysUntilExam = nextExam ? Math.ceil((new Date(nextExam.exam_date).getTime() - Date.now()) / 86400000) : 0;
+  const daysUntilExam = nextExam ? Math.ceil((new Date(nextExam.exam_date + "T00:00:00").getTime() - new Date(new Date().setHours(0, 0, 0, 0)).getTime()) / 86400000) : 0;
   const maxMin = Math.max(...leaders.map(l => l.minutes), 1);
 
   return (
