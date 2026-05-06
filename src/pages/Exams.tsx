@@ -93,7 +93,7 @@ export default function Exams() {
                 </div>
                 <div className="mt-4">
                   <div className={`text-4xl font-bold tabular-nums ${urgent ? "text-accent" : "text-gradient"}`}>{days}</div>
-                  <div className="text-xs text-muted-foreground">{days === 1 ? "day" : "days"} away · {format(new Date(e.exam_date), "EEE, MMM d")}</div>
+                  <div className="text-xs text-muted-foreground">{days === 1 ? "day" : "days"} away · {format(new Date(e.exam_date + "T00:00:00"), "EEE, MMM d")}</div>
                 </div>
               </Card>
             );
