@@ -37,7 +37,7 @@ export default function Homework() {
   const active = items.filter(i => !i.completed);
   const sorted = [...items].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
-    return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    return new Date(a.due_date + "T00:00:00").getTime() - new Date(b.due_date + "T00:00:00").getTime();
   });
 
   const add = async () => {
