@@ -13,10 +13,22 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
   const nav = useNavigate();
+
+  const validatePassword = (pwd: string) => {
+    if (pwd.length < 8) return "Password must be at least 8 characters long.";
+    if (!/\d/.test(pwd)) return "Password must include at least one number.";
+    return "";
+  };
 
   const handleEmail = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === "signup") {
+      const error = validatePassword(password);
+      setPasswordError(error);
+      if (error) return;
+    }
     setLoading(true);
     try {
       if (mode === "signup") {
