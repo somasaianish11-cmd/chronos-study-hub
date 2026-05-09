@@ -86,7 +86,13 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
               <div><Label htmlFor="name">Name</Label><Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="Alex" /></div>
             )}
             <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@school.edu" /></div>
-            <div><Label htmlFor="password">Password</Label><Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" minLength={6} /></div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" required value={password} onChange={e => { setPassword(e.target.value); setPasswordError(""); }} placeholder="••••••••" />
+              {mode === "signup" && passwordError && (
+                <p className="text-sm text-destructive mt-1">{passwordError}</p>
+              )}
+            </div>
             <Button type="submit" className="w-full" disabled={loading}>{loading ? "Please wait…" : (mode === "login" ? "Sign in" : "Create account")}</Button>
           </form>
 
