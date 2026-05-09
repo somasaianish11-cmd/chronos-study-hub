@@ -20,16 +20,19 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const response = await supabase.auth.signUp({
           email, password,
           options: { emailRedirectTo: `${window.location.origin}/dashboard`, data: { display_name: name || email.split("@")[0] } },
         });
-        if (error) throw error;
+        console.log("Supabase signUp response:", response);
+        if (response.error) throw response.error;
+        if (!response.data.user) throw new Error("Signup failed: no user returned");
         toast.success("Welcome to Chronos!");
         nav("/dashboard");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        const response = await supabase.auth.signInWithPassword({ email, password });
+        console.log("Supabase signIn response:", response);
+        if (response.error) throw response.error;
         toast.success("Welcome back!");
         nav("/dashboard");
       }
