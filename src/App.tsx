@@ -15,6 +15,8 @@ import Homework from "./pages/Homework";
 import Exams from "./pages/Exams";
 import Leaderboard from "./pages/Leaderboard";
 import Pricing from "./pages/Pricing";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
 import { BattleMode, Flashcards } from "./pages/ProFeatures";
 import NotFound from "./pages/NotFound.tsx";
@@ -34,6 +36,8 @@ const App = () => (
             <Route path="/login" element={<Auth mode="login" />} />
             <Route path="/signup" element={<Auth mode="signup" />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
