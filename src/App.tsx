@@ -15,6 +15,8 @@ import Homework from "./pages/Homework";
 import Exams from "./pages/Exams";
 import Leaderboard from "./pages/Leaderboard";
 import Pricing from "./pages/Pricing";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
 import { BattleMode, Flashcards } from "./pages/ProFeatures";
 import NotFound from "./pages/NotFound.tsx";
