@@ -87,7 +87,14 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
             )}
             <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@school.edu" /></div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                {mode === "login" && (
+                  <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+                    Forgot password?
+                  </Link>
+                )}
+              </div>
               <Input id="password" type="password" required value={password} onChange={e => { setPassword(e.target.value); setPasswordError(""); }} placeholder="••••••••" />
               {mode === "signup" && passwordError && (
                 <p className="text-sm text-destructive mt-1">{passwordError}</p>
