@@ -27,7 +27,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
 
   const loadSubscription = async (uid: string) => {
-    const { data } = await supabase.from("subscriptions").select("tier, status, billing_period").eq("user_id", uid).maybeSingle();
+    const { data, error } = await supabase
+      .from("subscriptions")
+      .select("tier, status, billing_period")
+      .eq("user_id", uid)
+      .maybeSingle();
+    console.log("[Auth] Subscription fetch for user:", uid, { data, error });
     if (data) setSubscription(data as Subscription);
     else setSubscription({ tier: "free", status: "active" });
   };
