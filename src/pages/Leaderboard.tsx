@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Trophy } from "lucide-react";
-import { startOfWeek } from "date-fns";
+
 
 export default function Leaderboard() {
   const { user } = useAuth();
@@ -11,16 +11,12 @@ export default function Leaderboard() {
 
   useEffect(() => {
     (async () => {
-      const wkStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
-      const { data: sessions } = await supabase.from("study_sessions").select("user_id, duration_minutes").gte("completed_at", wkStart);
-      const totals: Record<string, number> = {};
-      (sessions || []).forEach((s: any) => { totals[s.user_id] = (totals[s.user_id] || 0) + s.duration_minutes; });
-      const ids = Object.keys(totals);
-      if (!ids.length) return setRows([]);
-      const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", ids);
-      setRows(ids.map(id => ({ id, minutes: totals[id], name: profs?.find(p => p.id === id)?.display_name || "Student" })).sort((a, b) => b.minutes - a.minutes));
+      const { data, error } = await supabase.rpc("weekly_leaderboard");
+      if (error) return;
+      setRows((data || []).map((r: any) => ({ id: r.user_id, name: r.display_name || "Student", minutes: Number(r.total_minutes) })));
     })();
   }, []);
+
 
   const max = Math.max(...rows.map(r => r.minutes), 1);
 
