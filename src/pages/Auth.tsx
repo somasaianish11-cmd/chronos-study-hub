@@ -43,7 +43,7 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
         nav("/dashboard");
       } else {
         const response = await supabase.auth.signInWithPassword({ email, password });
-        console.log("Supabase signIn response:", response);
+        
         if (response.error) throw response.error;
         toast.success("Welcome back!");
         nav("/dashboard");
