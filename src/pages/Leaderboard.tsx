@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Trophy } from "lucide-react";
-import { startOfWeek } from "date-fns";
+
 
 export default function Leaderboard() {
   const { user } = useAuth();
