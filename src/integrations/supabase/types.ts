@@ -402,7 +402,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_pro: { Args: { uid: string }; Returns: boolean }
+      weekly_leaderboard: {
+        Args: never
+        Returns: {
+          display_name: string
+          total_minutes: number
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
