@@ -58,8 +58,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => { await supabase.auth.signOut(); };
   const refreshSubscription = async () => { if (user) await loadSubscription(user.id); };
 
+  const isPro =
+    subscription?.tier === "pro" &&
+    (subscription?.status === "active" || subscription?.status === "trialing");
+
   return (
-    <Ctx.Provider value={{ user, session, loading, subscription, isPro: subscription?.tier === "pro", signOut, refreshSubscription }}>
+    <Ctx.Provider value={{ user, session, loading, subscription, isPro, signOut, refreshSubscription }}>
       {children}
     </Ctx.Provider>
   );
