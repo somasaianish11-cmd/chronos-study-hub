@@ -36,7 +36,7 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
           email, password,
           options: { emailRedirectTo: `${window.location.origin}/dashboard`, data: { display_name: name || email.split("@")[0] } },
         });
-        console.log("Supabase signUp response:", response);
+        
         if (response.error) throw response.error;
         if (!response.data.user) throw new Error("Signup failed: no user returned");
         toast.success("Welcome to Chronos!");
