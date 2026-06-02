@@ -27,7 +27,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
 
   const loadSubscription = async (uid: string) => {
-    const { data } = await supabase.from("subscriptions").select("tier, status, billing_period").eq("user_id", uid).maybeSingle();
+    const { data, error } = await supabase
+      .from("subscriptions")
+      .select("tier, status, billing_period")
+      .eq("user_id", uid)
+      .maybeSingle();
+    console.log("[Auth] Subscription fetch for user:", uid, { data, error });
     if (data) setSubscription(data as Subscription);
     else setSubscription({ tier: "free", status: "active" });
   };
@@ -53,8 +58,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => { await supabase.auth.signOut(); };
   const refreshSubscription = async () => { if (user) await loadSubscription(user.id); };
 
+  const isPro =
+    subscription?.tier === "pro" &&
+    (subscription?.status === "active" || subscription?.status === "trialing");
+
   return (
-    <Ctx.Provider value={{ user, session, loading, subscription, isPro: subscription?.tier === "pro", signOut, refreshSubscription }}>
+    <Ctx.Provider value={{ user, session, loading, subscription, isPro, signOut, refreshSubscription }}>
       {children}
     </Ctx.Provider>
   );
