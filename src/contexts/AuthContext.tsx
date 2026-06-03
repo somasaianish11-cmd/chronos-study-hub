@@ -3,9 +3,8 @@ import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Subscription {
-  id?: string;
   user_id?: string;
-  plan: "free" | "pro";
+  tier: "free" | "pro";
   status: string;
 }
 
