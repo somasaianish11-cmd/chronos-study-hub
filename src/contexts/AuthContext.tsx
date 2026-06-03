@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshSubscription = async () => { if (user) await loadSubscription(user.id); };
 
   const isPro =
-    subscription?.plan === "pro" &&
+    subscription?.tier === "pro" &&
     (subscription?.status === "active" || subscription?.status === "trialing");
 
   return (
