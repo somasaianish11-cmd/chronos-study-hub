@@ -3,9 +3,10 @@ import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Subscription {
+  id?: string;
+  user_id?: string;
   plan: "free" | "pro";
   status: string;
-  billing_period?: string | null;
 }
 
 interface AuthCtx {
@@ -29,7 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadSubscription = async (uid: string) => {
     const { data, error } = await supabase
       .from("subscriptions")
-      .select("plan, status, billing_period")
+      .select("id, user_id, plan, status")
       .eq("user_id", uid)
       .maybeSingle();
     console.log("[Auth] Subscription fetch for user:", uid, { data, error });
