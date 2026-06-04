@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface Subscription {
   user_id?: string;
-  tier: "free" | "pro";
+  plan: "free" | "pro";
   status: string;
 }
 
@@ -29,12 +29,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadSubscription = async (uid: string) => {
     const { data, error } = await supabase
       .from("subscriptions")
-      .select("user_id, tier, status")
+      .select("user_id, plan, status")
       .eq("user_id", uid)
       .maybeSingle();
     console.log("[Auth] Subscription fetch for user:", uid, { data, error });
     if (data) setSubscription(data as unknown as Subscription);
-    else setSubscription({ tier: "free", status: "active" });
+    else setSubscription({ plan: "free", status: "active" });
   };
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshSubscription = async () => { if (user) await loadSubscription(user.id); };
 
   const isPro =
-    subscription?.tier === "pro" &&
+    subscription?.plan === "pro" &&
     (subscription?.status === "active" || subscription?.status === "trialing");
 
   return (
