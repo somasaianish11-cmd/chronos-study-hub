@@ -110,7 +110,7 @@ export default function Dashboard() {
                       <div className="text-sm truncate">{l.name}{isMe && " (you)"}</div>
                       <div className="h-1 mt-1 rounded-full bg-secondary overflow-hidden"><div className="h-full gradient-primary" style={{ width: `${(l.minutes / maxMin) * 100}%` }} /></div>
                     </div>
-                    <span className="text-xs text-muted-foreground tabular-nums">{Math.floor(l.minutes / 60)}h</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{l.minutes < 60 ? `${l.minutes}m` : `${Math.floor(l.minutes / 60)}h`}</span>
                   </div>
                 );
               })}

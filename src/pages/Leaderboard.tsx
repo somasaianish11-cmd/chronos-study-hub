@@ -3,7 +3,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Trophy } from "lucide-react";
+import { startOfWeek } from "date-fns";
 
+function formatMinutes(minutes: number) {
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
 
 export default function Leaderboard() {
   const { user } = useAuth();
@@ -11,20 +18,47 @@ export default function Leaderboard() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.rpc("weekly_leaderboard");
-      if (error) return;
-      setRows((data || []).map((r: any) => ({ id: r.user_id, name: r.display_name || "Student", minutes: Number(r.total_minutes) })));
+      const wkStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
+      const { data: allSessions } = await supabase
+        .from("study_sessions")
+        .select("user_id, duration_minutes")
+        .gte("completed_at", wkStart);
+
+      const totals: Record<string, number> = {};
+      (allSessions || []).forEach((s: any) => {
+        totals[s.user_id] = (totals[s.user_id] || 0) + s.duration_minutes;
+      });
+
+      const ids = Object.keys(totals).filter((id) => totals[id] > 0);
+      if (ids.length === 0) {
+        setRows([]);
+        return;
+      }
+
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", ids);
+
+      const ranked = ids
+        .map((id) => ({
+          id,
+          minutes: totals[id],
+          name: profs?.find((p) => p.id === id)?.display_name || "Student",
+        }))
+        .sort((a, b) => b.minutes - a.minutes);
+
+      setRows(ranked);
     })();
   }, []);
 
-
-  const max = Math.max(...rows.map(r => r.minutes), 1);
+  const max = Math.max(...rows.map((r) => r.minutes), 1);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Weekly Leaderboard</h1>
-        <p className="text-muted-foreground">Total study hours this week</p>
+        <p className="text-muted-foreground">Total study time this week</p>
       </div>
 
       {rows.length === 0 ? (
@@ -50,7 +84,7 @@ export default function Leaderboard() {
                     </div>
                   </div>
                   <div className="text-right tabular-nums">
-                    <div className="font-semibold text-sm">{Math.floor(r.minutes / 60)}h {r.minutes % 60}m</div>
+                    <div className="font-semibold text-sm">{formatMinutes(r.minutes)}</div>
                   </div>
                 </div>
               );
