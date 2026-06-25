@@ -18,7 +18,7 @@ import Pricing from "./pages/Pricing";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
-import { BattleMode } from "./pages/ProFeatures";
+import BattleMode from "./pages/BattleMode";
 import Flashcards from "./pages/Flashcards";
 import NotFound from "./pages/NotFound.tsx";
 
