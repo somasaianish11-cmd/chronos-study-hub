@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -23,6 +23,18 @@ import {
   X,
   RotateCcw,
   Sparkles,
+  BookOpen,
+  Brain,
+  Lightbulb,
+  Rocket,
+  Atom,
+  Globe,
+  Calculator,
+  Beaker,
+  Music,
+  Palette,
+  Code,
+  Heart,
 } from "lucide-react";
 import { toast } from "sonner";
 import UpgradeModal from "@/components/UpgradeModal";
@@ -39,6 +51,28 @@ type Flashcard = {
   front: string;
   back: string;
   ease_score: number | null;
+};
+
+// Curated gradient + icon palette for decks (deterministic by id)
+const DECK_THEMES = [
+  { gradient: "from-violet-500 to-fuchsia-500", icon: Brain },
+  { gradient: "from-sky-500 to-blue-600", icon: Globe },
+  { gradient: "from-emerald-500 to-teal-500", icon: Beaker },
+  { gradient: "from-amber-500 to-orange-600", icon: Lightbulb },
+  { gradient: "from-rose-500 to-pink-600", icon: Heart },
+  { gradient: "from-indigo-500 to-purple-600", icon: Atom },
+  { gradient: "from-cyan-500 to-blue-500", icon: Code },
+  { gradient: "from-orange-500 to-red-500", icon: Rocket },
+  { gradient: "from-lime-500 to-emerald-500", icon: Calculator },
+  { gradient: "from-pink-500 to-rose-500", icon: Music },
+  { gradient: "from-purple-500 to-indigo-500", icon: Palette },
+  { gradient: "from-teal-500 to-cyan-500", icon: BookOpen },
+];
+
+const themeFor = (id: string) => {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return DECK_THEMES[h % DECK_THEMES.length];
 };
 
 export default function Flashcards() {
@@ -186,40 +220,61 @@ export default function Flashcards() {
           </p>
         </Card>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {decks.map((d) => (
-            <Card
-              key={d.id}
-              className="p-5 bg-gradient-card border-border hover:border-primary/40 transition-colors cursor-pointer group"
-              onClick={() => setActiveDeck(d)}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
-                  <Layers className="w-5 h-5 text-primary-foreground" />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {decks.map((d) => {
+            const { gradient, icon: Icon } = themeFor(d.id);
+            const count = counts[d.id] || 0;
+            return (
+              <Card
+                key={d.id}
+                onClick={() => setActiveDeck(d)}
+                className="group relative overflow-hidden p-0 bg-gradient-card border-border hover:border-primary/50 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-elevated"
+              >
+                {/* Color band */}
+                <div className={`relative h-24 bg-gradient-to-br ${gradient} overflow-hidden`}>
+                  <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 blur-2xl" />
+                  <div className="absolute -left-4 -bottom-8 w-28 h-28 rounded-full bg-black/20 blur-2xl" />
+                  <div className="absolute inset-0 flex items-center justify-between px-5">
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center ring-1 ring-white/30">
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-white tabular-nums leading-none">
+                        {count}
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/80 mt-1">
+                        {count === 1 ? "card" : "cards"}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 text-white hover:bg-white/20 hover:text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteDeck(d.id);
+                    }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="opacity-0 group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteDeck(d.id);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-              <h3 className="font-semibold mb-1 truncate">{d.name}</h3>
-              {d.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-                  {d.description}
-                </p>
-              )}
-              <div className="text-xs text-muted-foreground">
-                {counts[d.id] || 0} card{counts[d.id] === 1 ? "" : "s"}
-              </div>
-            </Card>
-          ))}
+
+                <div className="p-5">
+                  <h3 className="font-semibold mb-1 truncate">{d.name}</h3>
+                  {d.description ? (
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {d.description}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">
+                      Tap to open deck
+                    </p>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -280,6 +335,8 @@ function DeckDetail({
     load();
   };
 
+  const { gradient, icon: Icon } = themeFor(deck.id);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -287,6 +344,9 @@ function DeckDetail({
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
+          <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-glow`}>
+            <Icon className="w-5 h-5 text-white" />
+          </div>
           <div>
             <h1 className="text-2xl font-bold">{deck.name}</h1>
             {deck.description && (
@@ -316,7 +376,7 @@ function DeckDetail({
               </DialogHeader>
               <div className="space-y-3">
                 <div>
-                  <Label>Front (question)</Label>
+                  <Label>Front (term)</Label>
                   <Textarea
                     value={form.front}
                     onChange={(e) =>
@@ -327,7 +387,7 @@ function DeckDetail({
                   />
                 </div>
                 <div>
-                  <Label>Back (answer)</Label>
+                  <Label>Back (definition)</Label>
                   <Textarea
                     value={form.back}
                     onChange={(e) =>
@@ -360,13 +420,13 @@ function DeckDetail({
               >
                 <div className="text-sm whitespace-pre-wrap">
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                    Front
+                    Term
                   </div>
                   {c.front}
                 </div>
                 <div className="text-sm whitespace-pre-wrap">
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                    Back
+                    Definition
                   </div>
                   {c.back}
                 </div>
@@ -394,6 +454,13 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
   const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
   const [done, setDone] = useState(false);
 
+  // Swipe animation state: null | 'left' | 'right'
+  const [swipe, setSwipe] = useState<null | "left" | "right">(null);
+  // Drag state
+  const [dragX, setDragX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+
   useEffect(() => {
     (async () => {
       if (!user) return;
@@ -410,32 +477,64 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
 
   const current = cards[index];
 
-  const mark = async (correct: boolean) => {
-    if (!current) return;
-    const newScore = Math.max(
-      0,
-      Math.min(10, (current.ease_score ?? 0) + (correct ? 1 : -1))
-    );
-    await supabase
-      .from("flashcards")
-      .update({
-        ease_score: newScore,
-        last_reviewed_at: new Date().toISOString(),
-      })
-      .eq("id", current.id);
+  const mark = useCallback(
+    async (correct: boolean) => {
+      if (!current || swipe) return;
+      setSwipe(correct ? "right" : "left");
 
-    setStats((s) => ({
-      correct: s.correct + (correct ? 1 : 0),
-      incorrect: s.incorrect + (correct ? 0 : 1),
-    }));
+      // Persist
+      const newScore = Math.max(
+        0,
+        Math.min(10, (current.ease_score ?? 0) + (correct ? 1 : -1))
+      );
+      supabase
+        .from("flashcards")
+        .update({
+          ease_score: newScore,
+          last_reviewed_at: new Date().toISOString(),
+        })
+        .eq("id", current.id)
+        .then(() => {});
 
-    if (index + 1 >= cards.length) {
-      setDone(true);
-    } else {
-      setIndex(index + 1);
-      setFlipped(false);
-    }
-  };
+      // Wait for swipe animation
+      setTimeout(() => {
+        setStats((s) => ({
+          correct: s.correct + (correct ? 1 : 0),
+          incorrect: s.incorrect + (correct ? 0 : 1),
+        }));
+        if (index + 1 >= cards.length) {
+          setDone(true);
+        } else {
+          setIndex(index + 1);
+          setFlipped(false);
+        }
+        setSwipe(null);
+        setDragX(0);
+      }, 280);
+    },
+    [current, index, cards.length, swipe]
+  );
+
+  // Keyboard controls
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (done) return;
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        setFlipped((f) => !f);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (flipped) mark(true);
+        else setFlipped(true);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (flipped) mark(false);
+        else setFlipped(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [flipped, mark, done]);
 
   const restart = () => {
     setCards((c) => [...c].sort(() => Math.random() - 0.5));
@@ -443,6 +542,26 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
     setFlipped(false);
     setStats({ correct: 0, incorrect: 0 });
     setDone(false);
+  };
+
+  // Pointer drag handlers
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (!flipped) return; // only allow swipe after revealing answer
+    setDragging(true);
+    setStartX(e.clientX);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragging) return;
+    setDragX(e.clientX - startX);
+  };
+  const onPointerUp = () => {
+    if (!dragging) return;
+    setDragging(false);
+    const threshold = 120;
+    if (dragX > threshold) mark(true);
+    else if (dragX < -threshold) mark(false);
+    else setDragX(0);
   };
 
   if (cards.length === 0) {
@@ -463,86 +582,204 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
     const total = stats.correct + stats.incorrect;
     const pct = total ? Math.round((stats.correct / total) * 100) : 0;
     return (
-      <div className="space-y-6">
-        <Card className="p-12 text-center bg-gradient-card border-border max-w-xl mx-auto">
-          <div className="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
-            <Sparkles className="w-7 h-7 text-primary-foreground" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">Session complete</h2>
-          <p className="text-muted-foreground mb-6">
-            You got {stats.correct} of {total} correct ({pct}%).
-          </p>
-          <div className="flex items-center justify-center gap-2">
-            <Button variant="secondary" onClick={onExit}>
-              Back to deck
-            </Button>
-            <Button onClick={restart}>
-              <RotateCcw className="w-4 h-4 mr-1" />
-              Study again
-            </Button>
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <Card className="p-10 text-center bg-gradient-card border-border overflow-hidden relative">
+          <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: "var(--gradient-hero)" }} />
+          <div className="relative">
+            <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-5 shadow-glow">
+              <Sparkles className="w-8 h-8 text-primary-foreground" />
+            </div>
+            <h2 className="text-3xl font-bold mb-1">Session complete</h2>
+            <p className="text-muted-foreground mb-8">
+              Nice work on {deck.name}.
+            </p>
+
+            <div className="grid grid-cols-3 gap-3 mb-8">
+              <div className="rounded-xl bg-secondary/50 p-4">
+                <div className="text-3xl font-bold tabular-nums">{pct}%</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">
+                  Accuracy
+                </div>
+              </div>
+              <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-4">
+                <div className="text-3xl font-bold tabular-nums text-emerald-400">
+                  {stats.correct}
+                </div>
+                <div className="text-[10px] uppercase tracking-wider text-emerald-400/80 mt-1">
+                  Correct
+                </div>
+              </div>
+              <div className="rounded-xl bg-rose-500/10 ring-1 ring-rose-500/30 p-4">
+                <div className="text-3xl font-bold tabular-nums text-rose-400">
+                  {stats.incorrect}
+                </div>
+                <div className="text-[10px] uppercase tracking-wider text-rose-400/80 mt-1">
+                  Review
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <Button variant="secondary" onClick={onExit}>
+                Back to deck
+              </Button>
+              <Button onClick={restart}>
+                <RotateCcw className="w-4 h-4 mr-1" />
+                Restart deck
+              </Button>
+            </div>
           </div>
         </Card>
       </div>
     );
   }
 
+  // Compute drag visuals
+  const rotate = dragX / 18;
+  const correctOpacity = Math.min(1, Math.max(0, dragX / 140));
+  const incorrectOpacity = Math.min(1, Math.max(0, -dragX / 140));
+
+  // Swipe-off transform
+  const swipeTransform =
+    swipe === "right"
+      ? "translateX(140%) rotate(20deg)"
+      : swipe === "left"
+      ? "translateX(-140%) rotate(-20deg)"
+      : `translateX(${dragX}px) rotate(${rotate}deg)`;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Button variant="ghost" onClick={onExit}>
           <ArrowLeft className="w-4 h-4 mr-1" />
           Exit
         </Button>
-        <div className="text-sm text-muted-foreground tabular-nums">
-          {index + 1} / {cards.length} · ✓ {stats.correct} · ✗ {stats.incorrect}
+        <div className="text-sm text-muted-foreground tabular-nums flex items-center gap-3">
+          <span className="font-medium text-foreground">
+            {index + 1} <span className="text-muted-foreground">/ {cards.length}</span>
+          </span>
+          <span className="text-emerald-400">✓ {stats.correct}</span>
+          <span className="text-rose-400">✗ {stats.incorrect}</span>
         </div>
       </div>
 
-      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+      {/* Progress bar */}
+      <div className="h-2 rounded-full bg-secondary overflow-hidden">
         <div
-          className="h-full gradient-primary transition-all"
-          style={{ width: `${((index + 1) / cards.length) * 100}%` }}
+          className="h-full gradient-primary transition-all duration-500 ease-out shadow-glow"
+          style={{ width: `${(index / cards.length) * 100}%` }}
         />
       </div>
 
-      <Card
-        onClick={() => setFlipped((f) => !f)}
-        className="p-12 min-h-[320px] flex flex-col items-center justify-center text-center bg-gradient-card border-border cursor-pointer select-none hover:border-primary/40 transition-colors"
-      >
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-4">
-          {flipped ? "Answer" : "Question"}
-        </div>
-        <div className="text-xl font-medium whitespace-pre-wrap max-w-2xl">
-          {flipped ? current.back : current.front}
-        </div>
-        <div className="text-xs text-muted-foreground mt-6">
-          Click card to {flipped ? "see question" : "reveal answer"}
-        </div>
-      </Card>
+      {/* Flashcard with 3D flip */}
+      <div className="relative" style={{ perspective: "1600px" }}>
+        {/* Background stacked cards for depth */}
+        <div className="absolute inset-x-6 top-3 h-[340px] rounded-3xl bg-card/60 border border-border/60 -z-10 scale-[0.96]" />
+        <div className="absolute inset-x-10 top-6 h-[340px] rounded-3xl bg-card/40 border border-border/40 -z-20 scale-[0.92]" />
 
+        <div
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onClick={() => !dragging && Math.abs(dragX) < 4 && setFlipped((f) => !f)}
+          className="relative select-none touch-none cursor-pointer"
+          style={{
+            transform: swipeTransform,
+            transition: dragging ? "none" : "transform 280ms cubic-bezier(0.32, 0.72, 0, 1)",
+          }}
+        >
+          {/* Correct/Incorrect overlay badges */}
+          <div
+            className="pointer-events-none absolute top-6 left-6 z-20 px-4 py-2 rounded-xl border-2 border-emerald-400 text-emerald-400 font-bold tracking-wider text-sm -rotate-12"
+            style={{ opacity: correctOpacity }}
+          >
+            CORRECT
+          </div>
+          <div
+            className="pointer-events-none absolute top-6 right-6 z-20 px-4 py-2 rounded-xl border-2 border-rose-400 text-rose-400 font-bold tracking-wider text-sm rotate-12"
+            style={{ opacity: incorrectOpacity }}
+          >
+            REVIEW
+          </div>
+
+          <div
+            className="relative w-full h-[360px]"
+            style={{
+              transformStyle: "preserve-3d",
+              transition: "transform 600ms cubic-bezier(0.32, 0.72, 0, 1)",
+              transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            }}
+          >
+            {/* Front */}
+            <Card
+              className="absolute inset-0 p-10 flex flex-col items-center justify-center text-center bg-gradient-card border-border shadow-card rounded-3xl"
+              style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
+            >
+              <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-6">
+                Term
+              </div>
+              <div className="text-2xl md:text-3xl font-semibold whitespace-pre-wrap max-w-2xl leading-snug">
+                {current.front}
+              </div>
+              <div className="absolute bottom-5 text-xs text-muted-foreground">
+                Tap card or press Space to flip
+              </div>
+            </Card>
+
+            {/* Back */}
+            <Card
+              className="absolute inset-0 p-10 flex flex-col items-center justify-center text-center border-border shadow-elevated rounded-3xl"
+              style={{
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden",
+                transform: "rotateY(180deg)",
+                background:
+                  "linear-gradient(140deg, hsl(247 60% 16%) 0%, hsl(240 10% 9%) 60%)",
+              }}
+            >
+              <div className="text-[10px] uppercase tracking-[0.2em] text-primary-glow mb-6">
+                Definition
+              </div>
+              <div className="text-xl md:text-2xl font-medium whitespace-pre-wrap max-w-2xl leading-relaxed">
+                {current.back}
+              </div>
+              <div className="absolute bottom-5 text-xs text-muted-foreground">
+                Swipe or use ← →
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls */}
       <div className="grid grid-cols-2 gap-3">
         <Button
           size="lg"
           variant="outline"
           onClick={() => mark(false)}
-          disabled={!flipped}
-          className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={!flipped || !!swipe}
+          className="h-14 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/60 transition-all"
         >
-          <X className="w-5 h-5 mr-1" />
-          Incorrect
+          <X className="w-5 h-5 mr-2" />
+          Needs review
+          <kbd className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/30">←</kbd>
         </Button>
         <Button
           size="lg"
           onClick={() => mark(true)}
-          disabled={!flipped}
+          disabled={!flipped || !!swipe}
+          className="h-14 bg-emerald-500 hover:bg-emerald-600 text-white shadow-glow transition-all"
         >
-          <Check className="w-5 h-5 mr-1" />
-          Correct
+          <Check className="w-5 h-5 mr-2" />
+          Got it
+          <kbd className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-white/15 border border-white/20">→</kbd>
         </Button>
       </div>
       {!flipped && (
         <p className="text-xs text-center text-muted-foreground">
-          Flip the card before marking your answer.
+          Flip the card (Space) before marking your answer.
         </p>
       )}
     </div>
