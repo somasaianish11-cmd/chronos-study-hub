@@ -753,13 +753,23 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
           Exit
         </Button>
         <div className="text-sm text-muted-foreground tabular-nums flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTtsOn((v) => !v)}
+            title="Toggle read aloud (S)"
+            className={ttsOn ? "text-primary" : ""}
+          >
+            <Volume2 className="w-4 h-4" />
+          </Button>
           <span className="font-medium text-foreground">
             {index + 1} <span className="text-muted-foreground">/ {cards.length}</span>
           </span>
-          <span className="text-emerald-400">✓ {stats.correct}</span>
-          <span className="text-rose-400">✗ {stats.incorrect}</span>
+          <span className="text-emerald-400">✓ {stats.good + stats.easy}</span>
+          <span className="text-rose-400">✗ {stats.again + stats.hard}</span>
         </div>
       </div>
+
 
       {/* Progress bar */}
       <div className="h-2 rounded-full bg-secondary overflow-hidden">
