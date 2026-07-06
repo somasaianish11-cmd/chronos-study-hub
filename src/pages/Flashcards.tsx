@@ -568,12 +568,11 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
+  const [stats, setStats] = useState({ again: 0, hard: 0, good: 0, easy: 0 });
   const [done, setDone] = useState(false);
+  const [ttsOn, setTtsOn] = useState(false);
 
-  // Swipe animation state: null | 'left' | 'right'
   const [swipe, setSwipe] = useState<null | "left" | "right">(null);
-  // Drag state
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -583,87 +582,71 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
       if (!user) return;
       const { data } = await supabase
         .from("flashcards")
-        .select("id, deck_id, front, back, ease_score")
+        .select("id, deck_id, front, back, ease_score, interval_days, repetitions, next_review_date")
         .eq("deck_id", deck.id);
-      const shuffled = [...((data as Flashcard[]) || [])].sort(
-        () => Math.random() - 0.5
-      );
+      const shuffled = [...((data as Flashcard[]) || [])].sort(() => Math.random() - 0.5);
       setCards(shuffled);
     })();
+    return () => { try { window.speechSynthesis?.cancel(); } catch {} };
   }, [deck.id, user]);
 
   const current = cards[index];
 
-  const mark = useCallback(
-    async (correct: boolean) => {
-      if (!current || swipe) return;
-      setSwipe(correct ? "right" : "left");
+  // Auto-speak when TTS on
+  useEffect(() => {
+    if (!current || !ttsOn) return;
+    speak(flipped ? current.back : current.front);
+  }, [current, flipped, ttsOn]);
 
-      // Persist
-      const newScore = Math.max(
-        0,
-        Math.min(10, (current.ease_score ?? 0) + (correct ? 1 : -1))
-      );
+  const grade = useCallback(
+    async (g: Grade) => {
+      if (!current || swipe) return;
+      const sched = schedule(current, g);
+      setSwipe(g === "again" || g === "hard" ? "left" : "right");
+
       supabase
         .from("flashcards")
-        .update({
-          ease_score: newScore,
-          last_reviewed_at: new Date().toISOString(),
-        })
+        .update({ ...sched, last_reviewed_at: new Date().toISOString() })
         .eq("id", current.id)
         .then(() => {});
 
-      // Wait for swipe animation
       setTimeout(() => {
-        setStats((s) => ({
-          correct: s.correct + (correct ? 1 : 0),
-          incorrect: s.incorrect + (correct ? 0 : 1),
-        }));
-        if (index + 1 >= cards.length) {
-          setDone(true);
-        } else {
-          setIndex(index + 1);
-          setFlipped(false);
-        }
+        setStats((s) => ({ ...s, [g]: (s as any)[g] + 1 }));
+        if (index + 1 >= cards.length) setDone(true);
+        else { setIndex(index + 1); setFlipped(false); }
         setSwipe(null);
         setDragX(0);
-      }, 280);
+      }, 260);
     },
     [current, index, cards.length, swipe]
   );
 
-  // Keyboard controls
+  // Keyboard: space flip, 1/2/3/4 grade, S toggles speech
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (done) return;
-      if (e.key === " " || e.key === "Enter") {
-        e.preventDefault();
-        setFlipped((f) => !f);
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        if (flipped) mark(true);
-        else setFlipped(true);
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        if (flipped) mark(false);
-        else setFlipped(true);
-      }
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); setFlipped((f) => !f); return; }
+      if (e.key.toLowerCase() === "s") { setTtsOn((v) => !v); return; }
+      if (!flipped) { if (["1","2","3","4","ArrowLeft","ArrowRight"].includes(e.key)) setFlipped(true); return; }
+      if (e.key === "1" || e.key === "ArrowLeft") { e.preventDefault(); grade("again"); }
+      else if (e.key === "2") { e.preventDefault(); grade("hard"); }
+      else if (e.key === "3" || e.key === "ArrowRight") { e.preventDefault(); grade("good"); }
+      else if (e.key === "4") { e.preventDefault(); grade("easy"); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flipped, mark, done]);
+  }, [flipped, grade, done]);
 
   const restart = () => {
     setCards((c) => [...c].sort(() => Math.random() - 0.5));
     setIndex(0);
     setFlipped(false);
-    setStats({ correct: 0, incorrect: 0 });
+    setStats({ again: 0, hard: 0, good: 0, easy: 0 });
     setDone(false);
   };
 
-  // Pointer drag handlers
   const onPointerDown = (e: React.PointerEvent) => {
-    if (!flipped) return; // only allow swipe after revealing answer
+    if (!flipped) return;
     setDragging(true);
     setStartX(e.clientX);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -676,10 +659,11 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
     if (!dragging) return;
     setDragging(false);
     const threshold = 120;
-    if (dragX > threshold) mark(true);
-    else if (dragX < -threshold) mark(false);
+    if (dragX > threshold) grade("good");
+    else if (dragX < -threshold) grade("again");
     else setDragX(0);
   };
+
 
   if (cards.length === 0) {
     return (
