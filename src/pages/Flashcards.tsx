@@ -861,34 +861,56 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
       </div>
 
       {/* Controls */}
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          size="lg"
-          variant="outline"
-          onClick={() => mark(false)}
-          disabled={!flipped || !!swipe}
-          className="h-14 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/60 transition-all"
-        >
-          <X className="w-5 h-5 mr-2" />
-          Needs review
-          <kbd className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/30">←</kbd>
-        </Button>
-        <Button
-          size="lg"
-          onClick={() => mark(true)}
-          disabled={!flipped || !!swipe}
-          className="h-14 bg-emerald-500 hover:bg-emerald-600 text-white shadow-glow transition-all"
-        >
-          <Check className="w-5 h-5 mr-2" />
-          Got it
-          <kbd className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-white/15 border border-white/20">→</kbd>
-        </Button>
-      </div>
-      {!flipped && (
-        <p className="text-xs text-center text-muted-foreground">
-          Flip the card (Space) before marking your answer.
-        </p>
+      {/* SRS Controls */}
+      {flipped ? (
+        <div className="grid grid-cols-4 gap-2">
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => grade("again")}
+            disabled={!!swipe}
+            className="h-16 flex-col border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/60"
+          >
+            <span className="font-semibold">Again</span>
+            <span className="text-[10px] opacity-70">&lt; 10m · 1</span>
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => grade("hard")}
+            disabled={!!swipe}
+            className="h-16 flex-col border-orange-500/40 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300 hover:border-orange-500/60"
+          >
+            <span className="font-semibold">Hard</span>
+            <span className="text-[10px] opacity-70">soon · 2</span>
+          </Button>
+          <Button
+            size="lg"
+            onClick={() => grade("good")}
+            disabled={!!swipe}
+            className="h-16 flex-col bg-emerald-500 hover:bg-emerald-600 text-white shadow-glow"
+          >
+            <span className="font-semibold">Good</span>
+            <span className="text-[10px] opacity-80">1-3d · 3</span>
+          </Button>
+          <Button
+            size="lg"
+            onClick={() => grade("easy")}
+            disabled={!!swipe}
+            className="h-16 flex-col bg-sky-500 hover:bg-sky-600 text-white shadow-glow"
+          >
+            <span className="font-semibold">Easy</span>
+            <span className="text-[10px] opacity-80">4-7d · 4</span>
+          </Button>
+        </div>
+      ) : (
+        <div className="flex justify-center">
+          <Button size="lg" onClick={() => setFlipped(true)} className="h-14 px-10 shadow-glow">
+            Show answer <kbd className="ml-3 text-[10px] px-1.5 py-0.5 rounded bg-white/15 border border-white/20">Space</kbd>
+          </Button>
+        </div>
       )}
     </div>
+
   );
 }
