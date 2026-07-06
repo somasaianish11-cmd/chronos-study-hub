@@ -680,8 +680,9 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
   }
 
   if (done) {
-    const total = stats.correct + stats.incorrect;
-    const pct = total ? Math.round((stats.correct / total) * 100) : 0;
+    const total = stats.again + stats.hard + stats.good + stats.easy;
+    const correct = stats.good + stats.easy;
+    const pct = total ? Math.round((correct / total) * 100) : 0;
     return (
       <div className="space-y-6 max-w-2xl mx-auto">
         <Card className="p-10 text-center bg-gradient-card border-border overflow-hidden relative">
@@ -691,39 +692,33 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
               <Sparkles className="w-8 h-8 text-primary-foreground" />
             </div>
             <h2 className="text-3xl font-bold mb-1">Session complete</h2>
-            <p className="text-muted-foreground mb-8">
-              Nice work on {deck.name}.
-            </p>
+            <p className="text-muted-foreground mb-8">Nice work on {deck.name}.</p>
 
-            <div className="grid grid-cols-3 gap-3 mb-8">
-              <div className="rounded-xl bg-secondary/50 p-4">
-                <div className="text-3xl font-bold tabular-nums">{pct}%</div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">
-                  Accuracy
-                </div>
+            <div className="grid grid-cols-5 gap-2 mb-8">
+              <div className="rounded-xl bg-secondary/50 p-3">
+                <div className="text-2xl font-bold tabular-nums">{pct}%</div>
+                <div className="text-[9px] uppercase tracking-wider text-muted-foreground mt-1">Accuracy</div>
               </div>
-              <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-4">
-                <div className="text-3xl font-bold tabular-nums text-emerald-400">
-                  {stats.correct}
-                </div>
-                <div className="text-[10px] uppercase tracking-wider text-emerald-400/80 mt-1">
-                  Correct
-                </div>
+              <div className="rounded-xl bg-rose-500/10 ring-1 ring-rose-500/30 p-3">
+                <div className="text-2xl font-bold tabular-nums text-rose-400">{stats.again}</div>
+                <div className="text-[9px] uppercase tracking-wider text-rose-400/80 mt-1">Again</div>
               </div>
-              <div className="rounded-xl bg-rose-500/10 ring-1 ring-rose-500/30 p-4">
-                <div className="text-3xl font-bold tabular-nums text-rose-400">
-                  {stats.incorrect}
-                </div>
-                <div className="text-[10px] uppercase tracking-wider text-rose-400/80 mt-1">
-                  Review
-                </div>
+              <div className="rounded-xl bg-orange-500/10 ring-1 ring-orange-500/30 p-3">
+                <div className="text-2xl font-bold tabular-nums text-orange-400">{stats.hard}</div>
+                <div className="text-[9px] uppercase tracking-wider text-orange-400/80 mt-1">Hard</div>
+              </div>
+              <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3">
+                <div className="text-2xl font-bold tabular-nums text-emerald-400">{stats.good}</div>
+                <div className="text-[9px] uppercase tracking-wider text-emerald-400/80 mt-1">Good</div>
+              </div>
+              <div className="rounded-xl bg-sky-500/10 ring-1 ring-sky-500/30 p-3">
+                <div className="text-2xl font-bold tabular-nums text-sky-400">{stats.easy}</div>
+                <div className="text-[9px] uppercase tracking-wider text-sky-400/80 mt-1">Easy</div>
               </div>
             </div>
 
             <div className="flex items-center justify-center gap-2 flex-wrap">
-              <Button variant="secondary" onClick={onExit}>
-                Back to deck
-              </Button>
+              <Button variant="secondary" onClick={onExit}>Back to deck</Button>
               <Button onClick={restart}>
                 <RotateCcw className="w-4 h-4 mr-1" />
                 Restart deck
@@ -734,6 +729,7 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
       </div>
     );
   }
+
 
   // Compute drag visuals
   const rotate = dragX / 18;
