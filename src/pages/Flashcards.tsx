@@ -51,7 +51,53 @@ type Flashcard = {
   front: string;
   back: string;
   ease_score: number | null;
+  interval_days?: number | null;
+  repetitions?: number | null;
+  next_review_date?: string | null;
 };
+
+// --- Text to speech helper ---
+const speak = (text: string) => {
+  try {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.95;
+    u.pitch = 1;
+    window.speechSynthesis.speak(u);
+  } catch {}
+};
+
+// --- SM-2-lite spaced repetition ---
+type Grade = "again" | "hard" | "good" | "easy";
+const GRADE_META: Record<Grade, { label: string; color: string; key: string }> = {
+  again: { label: "Again", color: "rose", key: "1" },
+  hard: { label: "Hard", color: "orange", key: "2" },
+  good: { label: "Good", color: "emerald", key: "3" },
+  easy: { label: "Easy", color: "sky", key: "4" },
+};
+
+function schedule(card: Flashcard, grade: Grade) {
+  let ease = Math.max(1.3, (card.ease_score ?? 2.5));
+  let reps = card.repetitions ?? 0;
+  let interval = Number(card.interval_days ?? 0);
+
+  if (grade === "again") {
+    reps = 0;
+    interval = 0; // review today
+    ease = Math.max(1.3, ease - 0.2);
+  } else {
+    if (reps === 0) interval = grade === "easy" ? 4 : grade === "good" ? 1 : 0.5;
+    else if (reps === 1) interval = grade === "easy" ? 7 : grade === "good" ? 3 : 1;
+    else interval = Math.round(interval * (grade === "easy" ? ease + 0.3 : grade === "good" ? ease : 1.2));
+    reps += 1;
+    if (grade === "hard") ease = Math.max(1.3, ease - 0.15);
+    if (grade === "easy") ease = ease + 0.15;
+  }
+  const nextDate = new Date(Date.now() + interval * 86400000).toISOString();
+  return { ease_score: Number(ease.toFixed(2)), repetitions: reps, interval_days: interval, next_review_date: nextDate };
+}
+
 
 // Curated gradient + icon palette for decks (deterministic by id)
 const DECK_THEMES = [
