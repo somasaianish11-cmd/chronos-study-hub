@@ -148,7 +148,10 @@ export type Database = {
           ease_score: number
           front: string
           id: string
+          interval_days: number
           last_reviewed_at: string | null
+          next_review_date: string | null
+          repetitions: number
           user_id: string
         }
         Insert: {
@@ -158,7 +161,10 @@ export type Database = {
           ease_score?: number
           front: string
           id?: string
+          interval_days?: number
           last_reviewed_at?: string | null
+          next_review_date?: string | null
+          repetitions?: number
           user_id: string
         }
         Update: {
@@ -168,7 +174,10 @@ export type Database = {
           ease_score?: number
           front?: string
           id?: string
+          interval_days?: number
           last_reviewed_at?: string | null
+          next_review_date?: string | null
+          repetitions?: number
           user_id?: string
         }
         Relationships: [
