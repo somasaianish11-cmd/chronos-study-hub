@@ -19,8 +19,6 @@ import {
   Trash2,
   ArrowLeft,
   Play,
-  Check,
-  X,
   RotateCcw,
   Sparkles,
   BookOpen,
@@ -35,7 +33,11 @@ import {
   Palette,
   Code,
   Heart,
+  Volume2,
+  Wand2,
+  Loader2,
 } from "lucide-react";
+
 import { toast } from "sonner";
 import UpgradeModal from "@/components/UpgradeModal";
 
@@ -51,7 +53,53 @@ type Flashcard = {
   front: string;
   back: string;
   ease_score: number | null;
+  interval_days?: number | null;
+  repetitions?: number | null;
+  next_review_date?: string | null;
 };
+
+// --- Text to speech helper ---
+const speak = (text: string) => {
+  try {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.95;
+    u.pitch = 1;
+    window.speechSynthesis.speak(u);
+  } catch {}
+};
+
+// --- SM-2-lite spaced repetition ---
+type Grade = "again" | "hard" | "good" | "easy";
+const GRADE_META: Record<Grade, { label: string; color: string; key: string }> = {
+  again: { label: "Again", color: "rose", key: "1" },
+  hard: { label: "Hard", color: "orange", key: "2" },
+  good: { label: "Good", color: "emerald", key: "3" },
+  easy: { label: "Easy", color: "sky", key: "4" },
+};
+
+function schedule(card: Flashcard, grade: Grade) {
+  let ease = Math.max(1.3, (card.ease_score ?? 2.5));
+  let reps = card.repetitions ?? 0;
+  let interval = Number(card.interval_days ?? 0);
+
+  if (grade === "again") {
+    reps = 0;
+    interval = 0; // review today
+    ease = Math.max(1.3, ease - 0.2);
+  } else {
+    if (reps === 0) interval = grade === "easy" ? 4 : grade === "good" ? 1 : 0.5;
+    else if (reps === 1) interval = grade === "easy" ? 7 : grade === "good" ? 3 : 1;
+    else interval = Math.round(interval * (grade === "easy" ? ease + 0.3 : grade === "good" ? ease : 1.2));
+    reps += 1;
+    if (grade === "hard") ease = Math.max(1.3, ease - 0.15);
+    if (grade === "easy") ease = ease + 0.15;
+  }
+  const nextDate = new Date(Date.now() + interval * 86400000).toISOString();
+  return { ease_score: Number(ease.toFixed(2)), repetitions: reps, interval_days: interval, next_review_date: nextDate };
+}
+
 
 // Curated gradient + icon palette for decks (deterministic by id)
 const DECK_THEMES = [
@@ -300,6 +348,10 @@ function DeckDetail({
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ front: "", back: "" });
+  const [showAI, setShowAI] = useState(false);
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+
 
   const load = async () => {
     if (!user) return;
@@ -335,7 +387,37 @@ function DeckDetail({
     load();
   };
 
+  const generateWithAI = async () => {
+    if (!user || !aiTopic.trim()) return;
+    setAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-flashcards", {
+        body: { topic: aiTopic.trim(), count: 5 },
+      });
+      if (error) throw error;
+      const generated = (data?.cards || []) as { front: string; back: string }[];
+      if (generated.length === 0) throw new Error("No cards generated");
+      const rows = generated.map((c) => ({
+        user_id: user.id,
+        deck_id: deck.id,
+        front: c.front,
+        back: c.back,
+      }));
+      const { error: insErr } = await supabase.from("flashcards").insert(rows);
+      if (insErr) throw insErr;
+      toast.success(`Added ${generated.length} AI-generated cards`);
+      setAiTopic("");
+      setShowAI(false);
+      load();
+    } catch (e: any) {
+      toast.error(e.message || "AI generation failed");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const { gradient, icon: Icon } = themeFor(deck.id);
+
 
   return (
     <div className="space-y-6">
@@ -363,6 +445,41 @@ function DeckDetail({
             <Play className="w-4 h-4 mr-1" />
             Study ({cards.length})
           </Button>
+          <Dialog open={showAI} onOpenChange={setShowAI}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-primary/40 text-primary hover:bg-primary/10">
+                <Wand2 className="w-4 h-4 mr-1" />
+                AI generate
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  Generate 5 flashcards with AI
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <Label>Sub-topic or study text</Label>
+                  <Textarea
+                    value={aiTopic}
+                    onChange={(e) => setAiTopic(e.target.value)}
+                    rows={5}
+                    placeholder="e.g. Krebs cycle, or paste a passage from your notes…"
+                  />
+                </div>
+                <Button onClick={generateWithAI} disabled={aiLoading || !aiTopic.trim()} className="w-full">
+                  {aiLoading ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Generating…</>
+                  ) : (
+                    <><Sparkles className="w-4 h-4 mr-1" /> Generate 5 cards</>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={show} onOpenChange={setShow}>
             <DialogTrigger asChild>
               <Button>
@@ -451,12 +568,11 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
+  const [stats, setStats] = useState({ again: 0, hard: 0, good: 0, easy: 0 });
   const [done, setDone] = useState(false);
+  const [ttsOn, setTtsOn] = useState(false);
 
-  // Swipe animation state: null | 'left' | 'right'
   const [swipe, setSwipe] = useState<null | "left" | "right">(null);
-  // Drag state
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -466,87 +582,71 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
       if (!user) return;
       const { data } = await supabase
         .from("flashcards")
-        .select("id, deck_id, front, back, ease_score")
+        .select("id, deck_id, front, back, ease_score, interval_days, repetitions, next_review_date")
         .eq("deck_id", deck.id);
-      const shuffled = [...((data as Flashcard[]) || [])].sort(
-        () => Math.random() - 0.5
-      );
+      const shuffled = [...((data as Flashcard[]) || [])].sort(() => Math.random() - 0.5);
       setCards(shuffled);
     })();
+    return () => { try { window.speechSynthesis?.cancel(); } catch {} };
   }, [deck.id, user]);
 
   const current = cards[index];
 
-  const mark = useCallback(
-    async (correct: boolean) => {
-      if (!current || swipe) return;
-      setSwipe(correct ? "right" : "left");
+  // Auto-speak when TTS on
+  useEffect(() => {
+    if (!current || !ttsOn) return;
+    speak(flipped ? current.back : current.front);
+  }, [current, flipped, ttsOn]);
 
-      // Persist
-      const newScore = Math.max(
-        0,
-        Math.min(10, (current.ease_score ?? 0) + (correct ? 1 : -1))
-      );
+  const grade = useCallback(
+    async (g: Grade) => {
+      if (!current || swipe) return;
+      const sched = schedule(current, g);
+      setSwipe(g === "again" || g === "hard" ? "left" : "right");
+
       supabase
         .from("flashcards")
-        .update({
-          ease_score: newScore,
-          last_reviewed_at: new Date().toISOString(),
-        })
+        .update({ ...sched, last_reviewed_at: new Date().toISOString() })
         .eq("id", current.id)
         .then(() => {});
 
-      // Wait for swipe animation
       setTimeout(() => {
-        setStats((s) => ({
-          correct: s.correct + (correct ? 1 : 0),
-          incorrect: s.incorrect + (correct ? 0 : 1),
-        }));
-        if (index + 1 >= cards.length) {
-          setDone(true);
-        } else {
-          setIndex(index + 1);
-          setFlipped(false);
-        }
+        setStats((s) => ({ ...s, [g]: (s as any)[g] + 1 }));
+        if (index + 1 >= cards.length) setDone(true);
+        else { setIndex(index + 1); setFlipped(false); }
         setSwipe(null);
         setDragX(0);
-      }, 280);
+      }, 260);
     },
     [current, index, cards.length, swipe]
   );
 
-  // Keyboard controls
+  // Keyboard: space flip, 1/2/3/4 grade, S toggles speech
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (done) return;
-      if (e.key === " " || e.key === "Enter") {
-        e.preventDefault();
-        setFlipped((f) => !f);
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        if (flipped) mark(true);
-        else setFlipped(true);
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        if (flipped) mark(false);
-        else setFlipped(true);
-      }
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); setFlipped((f) => !f); return; }
+      if (e.key.toLowerCase() === "s") { setTtsOn((v) => !v); return; }
+      if (!flipped) { if (["1","2","3","4","ArrowLeft","ArrowRight"].includes(e.key)) setFlipped(true); return; }
+      if (e.key === "1" || e.key === "ArrowLeft") { e.preventDefault(); grade("again"); }
+      else if (e.key === "2") { e.preventDefault(); grade("hard"); }
+      else if (e.key === "3" || e.key === "ArrowRight") { e.preventDefault(); grade("good"); }
+      else if (e.key === "4") { e.preventDefault(); grade("easy"); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flipped, mark, done]);
+  }, [flipped, grade, done]);
 
   const restart = () => {
     setCards((c) => [...c].sort(() => Math.random() - 0.5));
     setIndex(0);
     setFlipped(false);
-    setStats({ correct: 0, incorrect: 0 });
+    setStats({ again: 0, hard: 0, good: 0, easy: 0 });
     setDone(false);
   };
 
-  // Pointer drag handlers
   const onPointerDown = (e: React.PointerEvent) => {
-    if (!flipped) return; // only allow swipe after revealing answer
+    if (!flipped) return;
     setDragging(true);
     setStartX(e.clientX);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -559,10 +659,11 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
     if (!dragging) return;
     setDragging(false);
     const threshold = 120;
-    if (dragX > threshold) mark(true);
-    else if (dragX < -threshold) mark(false);
+    if (dragX > threshold) grade("good");
+    else if (dragX < -threshold) grade("again");
     else setDragX(0);
   };
+
 
   if (cards.length === 0) {
     return (
@@ -579,8 +680,9 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
   }
 
   if (done) {
-    const total = stats.correct + stats.incorrect;
-    const pct = total ? Math.round((stats.correct / total) * 100) : 0;
+    const total = stats.again + stats.hard + stats.good + stats.easy;
+    const correct = stats.good + stats.easy;
+    const pct = total ? Math.round((correct / total) * 100) : 0;
     return (
       <div className="space-y-6 max-w-2xl mx-auto">
         <Card className="p-10 text-center bg-gradient-card border-border overflow-hidden relative">
@@ -590,39 +692,33 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
               <Sparkles className="w-8 h-8 text-primary-foreground" />
             </div>
             <h2 className="text-3xl font-bold mb-1">Session complete</h2>
-            <p className="text-muted-foreground mb-8">
-              Nice work on {deck.name}.
-            </p>
+            <p className="text-muted-foreground mb-8">Nice work on {deck.name}.</p>
 
-            <div className="grid grid-cols-3 gap-3 mb-8">
-              <div className="rounded-xl bg-secondary/50 p-4">
-                <div className="text-3xl font-bold tabular-nums">{pct}%</div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">
-                  Accuracy
-                </div>
+            <div className="grid grid-cols-5 gap-2 mb-8">
+              <div className="rounded-xl bg-secondary/50 p-3">
+                <div className="text-2xl font-bold tabular-nums">{pct}%</div>
+                <div className="text-[9px] uppercase tracking-wider text-muted-foreground mt-1">Accuracy</div>
               </div>
-              <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-4">
-                <div className="text-3xl font-bold tabular-nums text-emerald-400">
-                  {stats.correct}
-                </div>
-                <div className="text-[10px] uppercase tracking-wider text-emerald-400/80 mt-1">
-                  Correct
-                </div>
+              <div className="rounded-xl bg-rose-500/10 ring-1 ring-rose-500/30 p-3">
+                <div className="text-2xl font-bold tabular-nums text-rose-400">{stats.again}</div>
+                <div className="text-[9px] uppercase tracking-wider text-rose-400/80 mt-1">Again</div>
               </div>
-              <div className="rounded-xl bg-rose-500/10 ring-1 ring-rose-500/30 p-4">
-                <div className="text-3xl font-bold tabular-nums text-rose-400">
-                  {stats.incorrect}
-                </div>
-                <div className="text-[10px] uppercase tracking-wider text-rose-400/80 mt-1">
-                  Review
-                </div>
+              <div className="rounded-xl bg-orange-500/10 ring-1 ring-orange-500/30 p-3">
+                <div className="text-2xl font-bold tabular-nums text-orange-400">{stats.hard}</div>
+                <div className="text-[9px] uppercase tracking-wider text-orange-400/80 mt-1">Hard</div>
+              </div>
+              <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3">
+                <div className="text-2xl font-bold tabular-nums text-emerald-400">{stats.good}</div>
+                <div className="text-[9px] uppercase tracking-wider text-emerald-400/80 mt-1">Good</div>
+              </div>
+              <div className="rounded-xl bg-sky-500/10 ring-1 ring-sky-500/30 p-3">
+                <div className="text-2xl font-bold tabular-nums text-sky-400">{stats.easy}</div>
+                <div className="text-[9px] uppercase tracking-wider text-sky-400/80 mt-1">Easy</div>
               </div>
             </div>
 
             <div className="flex items-center justify-center gap-2 flex-wrap">
-              <Button variant="secondary" onClick={onExit}>
-                Back to deck
-              </Button>
+              <Button variant="secondary" onClick={onExit}>Back to deck</Button>
               <Button onClick={restart}>
                 <RotateCcw className="w-4 h-4 mr-1" />
                 Restart deck
@@ -633,6 +729,7 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
       </div>
     );
   }
+
 
   // Compute drag visuals
   const rotate = dragX / 18;
@@ -656,13 +753,23 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
           Exit
         </Button>
         <div className="text-sm text-muted-foreground tabular-nums flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTtsOn((v) => !v)}
+            title="Toggle read aloud (S)"
+            className={ttsOn ? "text-primary" : ""}
+          >
+            <Volume2 className="w-4 h-4" />
+          </Button>
           <span className="font-medium text-foreground">
             {index + 1} <span className="text-muted-foreground">/ {cards.length}</span>
           </span>
-          <span className="text-emerald-400">✓ {stats.correct}</span>
-          <span className="text-rose-400">✗ {stats.incorrect}</span>
+          <span className="text-emerald-400">✓ {stats.good + stats.easy}</span>
+          <span className="text-rose-400">✗ {stats.again + stats.hard}</span>
         </div>
       </div>
+
 
       {/* Progress bar */}
       <div className="h-2 rounded-full bg-secondary overflow-hidden">
@@ -754,34 +861,56 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
       </div>
 
       {/* Controls */}
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          size="lg"
-          variant="outline"
-          onClick={() => mark(false)}
-          disabled={!flipped || !!swipe}
-          className="h-14 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/60 transition-all"
-        >
-          <X className="w-5 h-5 mr-2" />
-          Needs review
-          <kbd className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/30">←</kbd>
-        </Button>
-        <Button
-          size="lg"
-          onClick={() => mark(true)}
-          disabled={!flipped || !!swipe}
-          className="h-14 bg-emerald-500 hover:bg-emerald-600 text-white shadow-glow transition-all"
-        >
-          <Check className="w-5 h-5 mr-2" />
-          Got it
-          <kbd className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-white/15 border border-white/20">→</kbd>
-        </Button>
-      </div>
-      {!flipped && (
-        <p className="text-xs text-center text-muted-foreground">
-          Flip the card (Space) before marking your answer.
-        </p>
+      {/* SRS Controls */}
+      {flipped ? (
+        <div className="grid grid-cols-4 gap-2">
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => grade("again")}
+            disabled={!!swipe}
+            className="h-16 flex-col border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/60"
+          >
+            <span className="font-semibold">Again</span>
+            <span className="text-[10px] opacity-70">&lt; 10m · 1</span>
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => grade("hard")}
+            disabled={!!swipe}
+            className="h-16 flex-col border-orange-500/40 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300 hover:border-orange-500/60"
+          >
+            <span className="font-semibold">Hard</span>
+            <span className="text-[10px] opacity-70">soon · 2</span>
+          </Button>
+          <Button
+            size="lg"
+            onClick={() => grade("good")}
+            disabled={!!swipe}
+            className="h-16 flex-col bg-emerald-500 hover:bg-emerald-600 text-white shadow-glow"
+          >
+            <span className="font-semibold">Good</span>
+            <span className="text-[10px] opacity-80">1-3d · 3</span>
+          </Button>
+          <Button
+            size="lg"
+            onClick={() => grade("easy")}
+            disabled={!!swipe}
+            className="h-16 flex-col bg-sky-500 hover:bg-sky-600 text-white shadow-glow"
+          >
+            <span className="font-semibold">Easy</span>
+            <span className="text-[10px] opacity-80">4-7d · 4</span>
+          </Button>
+        </div>
+      ) : (
+        <div className="flex justify-center">
+          <Button size="lg" onClick={() => setFlipped(true)} className="h-14 px-10 shadow-glow">
+            Show answer <kbd className="ml-3 text-[10px] px-1.5 py-0.5 rounded bg-white/15 border border-white/20">Space</kbd>
+          </Button>
+        </div>
       )}
     </div>
+
   );
 }
