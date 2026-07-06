@@ -387,7 +387,37 @@ function DeckDetail({
     load();
   };
 
+  const generateWithAI = async () => {
+    if (!user || !aiTopic.trim()) return;
+    setAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-flashcards", {
+        body: { topic: aiTopic.trim(), count: 5 },
+      });
+      if (error) throw error;
+      const generated = (data?.cards || []) as { front: string; back: string }[];
+      if (generated.length === 0) throw new Error("No cards generated");
+      const rows = generated.map((c) => ({
+        user_id: user.id,
+        deck_id: deck.id,
+        front: c.front,
+        back: c.back,
+      }));
+      const { error: insErr } = await supabase.from("flashcards").insert(rows);
+      if (insErr) throw insErr;
+      toast.success(`Added ${generated.length} AI-generated cards`);
+      setAiTopic("");
+      setShowAI(false);
+      load();
+    } catch (e: any) {
+      toast.error(e.message || "AI generation failed");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const { gradient, icon: Icon } = themeFor(deck.id);
+
 
   return (
     <div className="space-y-6">
