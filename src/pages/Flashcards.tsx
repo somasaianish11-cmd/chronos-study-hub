@@ -19,8 +19,6 @@ import {
   Trash2,
   ArrowLeft,
   Play,
-  Check,
-  X,
   RotateCcw,
   Sparkles,
   BookOpen,
@@ -35,7 +33,11 @@ import {
   Palette,
   Code,
   Heart,
+  Volume2,
+  Wand2,
+  Loader2,
 } from "lucide-react";
+
 import { toast } from "sonner";
 import UpgradeModal from "@/components/UpgradeModal";
 
