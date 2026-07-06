@@ -445,6 +445,41 @@ function DeckDetail({
             <Play className="w-4 h-4 mr-1" />
             Study ({cards.length})
           </Button>
+          <Dialog open={showAI} onOpenChange={setShowAI}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-primary/40 text-primary hover:bg-primary/10">
+                <Wand2 className="w-4 h-4 mr-1" />
+                AI generate
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  Generate 5 flashcards with AI
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <Label>Sub-topic or study text</Label>
+                  <Textarea
+                    value={aiTopic}
+                    onChange={(e) => setAiTopic(e.target.value)}
+                    rows={5}
+                    placeholder="e.g. Krebs cycle, or paste a passage from your notes…"
+                  />
+                </div>
+                <Button onClick={generateWithAI} disabled={aiLoading || !aiTopic.trim()} className="w-full">
+                  {aiLoading ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Generating…</>
+                  ) : (
+                    <><Sparkles className="w-4 h-4 mr-1" /> Generate 5 cards</>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={show} onOpenChange={setShow}>
             <DialogTrigger asChild>
               <Button>
