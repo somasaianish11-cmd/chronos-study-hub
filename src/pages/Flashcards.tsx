@@ -459,7 +459,11 @@ function DeckDetail({
       </div>
 
       <Card className="p-5 bg-gradient-card border-border">
-        {cards.length === 0 ? (
+        {loading ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">
+            Loading cards…
+          </p>
+        ) : cards.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
             No cards yet — add your first one above.
           </p>
