@@ -348,9 +348,6 @@ function DeckDetail({
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ front: "", back: "" });
-  const [showAI, setShowAI] = useState(false);
-  const [aiTopic, setAiTopic] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
 
 
   const load = async () => {
