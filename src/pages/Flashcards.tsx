@@ -345,22 +345,26 @@ function DeckDetail({
   const { user } = useAuth();
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ front: "", back: "" });
 
-
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
+    setLoading(true);
+    const { data, error } = await supabase
       .from("flashcards")
       .select("id, deck_id, front, back, ease_score")
       .eq("deck_id", deck.id)
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
-    setCards((data as Flashcard[]) || []);
-  };
+    if (error) toast.error(error.message);
+    else setCards((data as Flashcard[]) || []);
+    setLoading(false);
+  }, [deck.id, user]);
 
   useEffect(() => {
     load();
-  }, [deck.id]);
+  }, [load]);
 
   const addCard = async () => {
     if (!user || !form.front.trim() || !form.back.trim()) return;
@@ -455,7 +459,11 @@ function DeckDetail({
       </div>
 
       <Card className="p-5 bg-gradient-card border-border">
-        {cards.length === 0 ? (
+        {loading ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">
+            Loading cards…
+          </p>
+        ) : cards.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
             No cards yet — add your first one above.
           </p>
