@@ -266,6 +266,7 @@ function Lobby({
   setRoomCode,
   generateRoomCode,
   copyCode,
+  joinRoom,
   onStart,
 }: {
   duration: Duration;
@@ -276,6 +277,7 @@ function Lobby({
   setRoomCode: (v: string) => void;
   generateRoomCode: () => void;
   copyCode: () => void;
+  joinRoom: () => void;
   onStart: () => void;
 }) {
   return (
