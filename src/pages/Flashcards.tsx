@@ -50,7 +50,7 @@ type Flashcard = {
   deck_id: string;
   front: string;
   back: string;
-  ease_score: number | null;
+  ease_score?: number | null;
   interval_days?: number | null;
   repetitions?: number | null;
   next_review_date?: string | null;
@@ -353,7 +353,7 @@ function DeckDetail({
     setLoading(true);
     const { data, error } = await supabase
       .from("flashcards")
-      .select("id, deck_id, front, back, ease_score")
+      .select("id, deck_id, user_id, front, back")
       .eq("deck_id", deck.id)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
@@ -521,7 +521,7 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
       if (!user) return;
       const { data } = await supabase
         .from("flashcards")
-        .select("id, deck_id, front, back, ease_score, interval_days, repetitions, next_review_date")
+        .select("id, deck_id, user_id, front, back")
         .eq("deck_id", deck.id);
       const shuffled = [...((data as Flashcard[]) || [])].sort(() => Math.random() - 0.5);
       setCards(shuffled);
@@ -540,14 +540,7 @@ function StudyMode({ deck, onExit }: { deck: Deck; onExit: () => void }) {
   const grade = useCallback(
     async (g: Grade) => {
       if (!current || swipe) return;
-      const sched = schedule(current, g);
       setSwipe(g === "again" || g === "hard" ? "left" : "right");
-
-      supabase
-        .from("flashcards")
-        .update({ ...sched, last_reviewed_at: new Date().toISOString() })
-        .eq("id", current.id)
-        .then(() => {});
 
       setTimeout(() => {
         setStats((s) => ({ ...s, [g]: (s as any)[g] + 1 }));
