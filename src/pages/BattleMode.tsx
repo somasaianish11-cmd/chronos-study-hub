@@ -367,19 +367,29 @@ function Lobby({
           </p>
 
           {mode === "room" && (
-            <div className="mt-4 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-              <Input
-                value={roomCode}
-                onChange={(e) => setRoomCode(e.target.value.toUpperCase().slice(0, 6))}
-                placeholder="CODE"
-                className="font-mono tracking-[0.3em] uppercase text-center"
-              />
-              <Button variant="secondary" size="icon" onClick={copyCode} disabled={!roomCode}>
-                <Copy className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" onClick={generateRoomCode}>
-                Generate
-              </Button>
+            <div className="mt-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={roomCode}
+                  onChange={(e) => setRoomCode(e.target.value.toUpperCase().slice(0, 6))}
+                  placeholder="ENTER OR GENERATE CODE"
+                  className="font-mono tracking-[0.3em] uppercase text-center"
+                />
+                <Button variant="secondary" size="icon" onClick={copyCode} disabled={!roomCode}>
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={generateRoomCode}>
+                  Generate
+                </Button>
+                <Button variant="default" onClick={joinRoom} disabled={roomCode.length < 4}>
+                  <Users className="w-4 h-4 mr-1" /> Join Room
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground text-center">
+                Paste a friend's code and hit Join, or Generate one to share.
+              </p>
             </div>
           )}
         </Card>
