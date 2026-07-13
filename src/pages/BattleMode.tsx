@@ -165,7 +165,23 @@ function BattleInner() {
 
   const surrender = () => {
     quitRef.current = true;
-    finish("loss");
+    setOutcome(null);
+    setSecondsLeft(0);
+    setOpponentProgress(0);
+    setTrash(null);
+    setPhase("lobby");
+    toast("Match abandoned");
+  };
+
+  const joinRoom = () => {
+    const code = roomCode.trim().toUpperCase();
+    if (code.length < 4) {
+      toast.error("Enter a valid room code");
+      return;
+    }
+    setOpponent(`Player ${code.slice(-3)}`);
+    toast.success(`Joining room ${code}...`);
+    setPhase("countdown");
   };
 
   const resetToLobby = () => {
