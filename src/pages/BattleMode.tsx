@@ -205,6 +205,7 @@ function BattleInner() {
         setRoomCode={setRoomCode}
         generateRoomCode={generateRoomCode}
         copyCode={copyCode}
+        joinRoom={joinRoom}
         onStart={startBattle}
       />
     );
