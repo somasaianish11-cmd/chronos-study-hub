@@ -50,7 +50,7 @@ type Flashcard = {
   deck_id: string;
   front: string;
   back: string;
-  ease_score: number | null;
+  ease_score?: number | null;
   interval_days?: number | null;
   repetitions?: number | null;
   next_review_date?: string | null;
