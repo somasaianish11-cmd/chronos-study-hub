@@ -354,10 +354,9 @@ function DeckDetail({
       .from("flashcards")
       .select("id, deck_id, user_id, front, back")
       .eq("deck_id", deck.id)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .eq("user_id", user.id);
     if (error) toast.error(error.message);
-    else setCards((data as Flashcard[]) || []);
+    else setCards(((data as Flashcard[]) || []).sort((a, b) => a.id.localeCompare(b.id)));
     setLoading(false);
   }, [deck.id, user]);
 
