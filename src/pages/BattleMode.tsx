@@ -189,8 +189,11 @@ function BattleInner() {
   const startBattle = () => {
     if (mode === "bot") {
       setOpponent(BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)]);
-    } else {
-      setOpponent(roomCode ? `Player ${roomCode.slice(-3).toUpperCase()}` : "Opponent");
+      setRoomId(null);
+      setIsHost(false);
+    } else if (!roomId) {
+      toast.error("Generate or join a room first");
+      return;
     }
     setPhase("countdown");
   };
@@ -201,14 +204,24 @@ function BattleInner() {
     const hostName =
       (user.user_metadata?.display_name as string) ||
       (user.email?.split("@")[0] ?? "Host");
-    const { error } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("battle_rooms")
-      .insert({ code, host_user_id: user.id, host_name: hostName });
-    if (error) {
-      toast.error("Couldn't create room: " + error.message);
+      .insert({
+        code,
+        host_user_id: user.id,
+        host_name: hostName,
+        duration_minutes: duration,
+      })
+      .select("id")
+      .single();
+    if (error || !data) {
+      toast.error("Couldn't create room: " + (error?.message ?? "unknown"));
       return;
     }
     setRoomCode(code);
+    setRoomId(data.id);
+    setIsHost(true);
+    setOpponent("Waiting for opponent…");
     toast.success(`Room ${code} created — share to invite.`);
   };
 
