@@ -63,6 +63,7 @@
     font-feature-settings: 'cv11', 'ss01', 'ss03';
   }
   ::selection { background: hsl(var(--primary) / 0.3); }
+  #lovable-badge { display: none !important; }
 }
 
 @layer utilities {
