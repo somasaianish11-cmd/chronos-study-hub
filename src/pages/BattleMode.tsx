@@ -151,8 +151,19 @@ function BattleInner() {
     setPhase("countdown");
   };
 
-  const generateRoomCode = () => {
+  const generateRoomCode = async () => {
+    if (!user) return;
     const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const hostName =
+      (user.user_metadata?.display_name as string) ||
+      (user.email?.split("@")[0] ?? "Host");
+    const { error } = await (supabase as any)
+      .from("battle_rooms")
+      .insert({ code, host_user_id: user.id, host_name: hostName });
+    if (error) {
+      toast.error("Couldn't create room: " + error.message);
+      return;
+    }
     setRoomCode(code);
     toast.success(`Room ${code} created — share to invite.`);
   };
@@ -169,18 +180,33 @@ function BattleInner() {
     setSecondsLeft(0);
     setOpponentProgress(0);
     setTrash(null);
+    setOpponent("Focus Bot");
     setPhase("lobby");
     toast("Match abandoned");
+    navigate("/battle", { replace: true });
   };
 
-  const joinRoom = () => {
+  const joinRoom = async () => {
     const code = roomCode.trim().toUpperCase();
     if (code.length < 4) {
       toast.error("Enter a valid room code");
       return;
     }
-    setOpponent(`Player ${code.slice(-3)}`);
-    toast.success(`Joining room ${code}...`);
+    const { data, error } = await (supabase as any)
+      .from("battle_rooms")
+      .select("host_name, host_user_id")
+      .eq("code", code)
+      .maybeSingle();
+    if (error || !data) {
+      toast.error("Room not found. Check the code and try again.");
+      return;
+    }
+    if (user && data.host_user_id === user.id) {
+      toast.error("You can't join your own room — share the code with a friend.");
+      return;
+    }
+    setOpponent(data.host_name || `Player ${code.slice(-3)}`);
+    toast.success(`Joining ${data.host_name}'s room...`);
     setPhase("countdown");
   };
 
