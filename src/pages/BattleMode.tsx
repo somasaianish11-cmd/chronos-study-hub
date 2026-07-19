@@ -238,12 +238,15 @@ function BattleInner() {
     setOpponentProgress(0);
     setTrash(null);
     setOpponent("Focus Bot");
+    setRoomId(null);
+    setIsHost(false);
     setPhase("lobby");
     toast("Match abandoned");
     navigate("/battle", { replace: true });
   };
 
   const joinRoom = async () => {
+    if (!user) return;
     const code = roomCode.trim().toUpperCase();
     if (code.length < 4) {
       toast.error("Enter a valid room code");
@@ -251,19 +254,40 @@ function BattleInner() {
     }
     const { data, error } = await (supabase as any)
       .from("battle_rooms")
-      .select("host_name, host_user_id")
+      .select("id, host_name, host_user_id, duration_minutes")
       .eq("code", code)
       .maybeSingle();
     if (error || !data) {
       toast.error("Room not found. Check the code and try again.");
       return;
     }
-    if (user && data.host_user_id === user.id) {
+    if (data.host_user_id === user.id) {
       toast.error("You can't join your own room — share the code with a friend.");
       return;
     }
+    const guestName =
+      (user.user_metadata?.display_name as string) ||
+      (user.email?.split("@")[0] ?? "Guest");
+    const { error: updErr } = await (supabase as any)
+      .from("battle_rooms")
+      .update({
+        guest_user_id: user.id,
+        guest_name: guestName,
+        guest_progress: 0,
+        status: "active",
+      })
+      .eq("id", data.id);
+    if (updErr) {
+      toast.error("Couldn't join room: " + updErr.message);
+      return;
+    }
+    if (data.duration_minutes && [15, 25, 45].includes(data.duration_minutes)) {
+      setDuration(data.duration_minutes as Duration);
+    }
+    setRoomId(data.id);
+    setIsHost(false);
     setOpponent(data.host_name || `Player ${code.slice(-3)}`);
-    toast.success(`Joining ${data.host_name}'s room...`);
+    toast.success(`Joined ${data.host_name}'s room!`);
     setPhase("countdown");
   };
 
