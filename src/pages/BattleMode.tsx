@@ -90,9 +90,10 @@ function BattleInner() {
     const now = Date.now();
     if (now - lastPushRef.current < 400) return;
     lastPushRef.current = now;
+    const myProgress = total ? 1 - secondsLeft / total : 0;
     const patch = isHost
-      ? { host_progress: userProgressValue(secondsLeft, duration) }
-      : { guest_progress: userProgressValue(secondsLeft, duration) };
+      ? { host_progress: myProgress }
+      : { guest_progress: myProgress };
     (supabase as any).from("battle_rooms").update(patch).eq("id", roomId).then(() => {});
   }, [secondsLeft, phase, mode, roomId, isHost, duration]);
 
