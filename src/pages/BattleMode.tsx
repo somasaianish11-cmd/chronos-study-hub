@@ -46,6 +46,8 @@ function BattleInner() {
   const [mode, setMode] = useState<Mode>("bot");
   const [roomCode, setRoomCode] = useState("");
   const [opponent, setOpponent] = useState<string>("Focus Bot");
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
 
   // Arena
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -55,6 +57,44 @@ function BattleInner() {
   const [xp, setXp] = useState(0);
   const [countdown, setCountdown] = useState(3);
   const quitRef = useRef(false);
+  const lastPushRef = useRef(0);
+
+  // Realtime subscription to the current battle_rooms row
+  useEffect(() => {
+    if (!roomId || mode !== "room") return;
+    const channel = supabase
+      .channel(`battle_room:${roomId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "battle_rooms", filter: `id=eq.${roomId}` },
+        (payload) => {
+          const row: any = payload.new;
+          if (isHost) {
+            if (row.guest_name) setOpponent(row.guest_name);
+            setOpponentProgress(Number(row.guest_progress) || 0);
+          } else {
+            if (row.host_name) setOpponent(row.host_name);
+            setOpponentProgress(Number(row.host_progress) || 0);
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId, isHost, mode]);
+
+  // Push my progress upstream while in the arena (room mode only)
+  useEffect(() => {
+    if (phase !== "arena" || mode !== "room" || !roomId) return;
+    const now = Date.now();
+    if (now - lastPushRef.current < 400) return;
+    lastPushRef.current = now;
+    const patch = isHost
+      ? { host_progress: userProgressValue(secondsLeft, duration) }
+      : { guest_progress: userProgressValue(secondsLeft, duration) };
+    (supabase as any).from("battle_rooms").update(patch).eq("id", roomId).then(() => {});
+  }, [secondsLeft, phase, mode, roomId, isHost, duration]);
 
   const total = duration * 60;
   const userProgress = total ? 1 - secondsLeft / total : 0;
