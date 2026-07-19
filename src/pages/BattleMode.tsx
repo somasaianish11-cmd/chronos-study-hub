@@ -132,11 +132,14 @@ function BattleInner() {
       const elapsed = Date.now() - start;
       const left = Math.max(0, total - Math.floor(elapsed / 1000));
       setSecondsLeft(left);
-      const op = mode === "room"
-        ? opponentProgress
-        : Math.min(1, elapsed / opponentTotalMs);
       if (mode !== "room") {
+        const op = Math.min(1, elapsed / opponentTotalMs);
         setOpponentProgress(op);
+        if (op >= 1) {
+          clearInterval(id);
+          finish("loss");
+          return;
+        }
       }
 
       // Trash talk every ~12s
@@ -154,13 +157,10 @@ function BattleInner() {
         setTimeout(() => setTrash(null), 3500);
       }
 
-      // End conditions
+      // Win by finishing the timer
       if (left <= 0) {
         clearInterval(id);
         finish("win");
-      } else if (op >= 1) {
-        clearInterval(id);
-        finish("loss");
       }
     }, 250);
     return () => clearInterval(id);
