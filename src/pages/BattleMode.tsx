@@ -132,9 +132,12 @@ function BattleInner() {
       const elapsed = Date.now() - start;
       const left = Math.max(0, total - Math.floor(elapsed / 1000));
       setSecondsLeft(left);
-      const op = Math.min(1, elapsed / opponentTotalMs);
-      // Add subtle jitter so it feels alive
-      setOpponentProgress(op);
+      const op = mode === "room"
+        ? opponentProgress
+        : Math.min(1, elapsed / opponentTotalMs);
+      if (mode !== "room") {
+        setOpponentProgress(op);
+      }
 
       // Trash talk every ~12s
       if (Date.now() - lastTrash > 12000 && left > 4) {
