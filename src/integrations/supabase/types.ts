@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      battle_rooms: {
+        Row: {
+          code: string
+          created_at: string
+          duration_minutes: number
+          guest_name: string | null
+          guest_progress: number
+          guest_user_id: string | null
+          host_name: string
+          host_progress: number
+          host_user_id: string
+          id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          duration_minutes?: number
+          guest_name?: string | null
+          guest_progress?: number
+          guest_user_id?: string | null
+          host_name: string
+          host_progress?: number
+          host_user_id: string
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          duration_minutes?: number
+          guest_name?: string | null
+          guest_progress?: number
+          guest_user_id?: string | null
+          host_name?: string
+          host_progress?: number
+          host_user_id?: string
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       battles: {
         Row: {
           challenger_id: string

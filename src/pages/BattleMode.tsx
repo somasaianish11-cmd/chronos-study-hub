@@ -46,6 +46,8 @@ function BattleInner() {
   const [mode, setMode] = useState<Mode>("bot");
   const [roomCode, setRoomCode] = useState("");
   const [opponent, setOpponent] = useState<string>("Focus Bot");
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
 
   // Arena
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -55,6 +57,45 @@ function BattleInner() {
   const [xp, setXp] = useState(0);
   const [countdown, setCountdown] = useState(3);
   const quitRef = useRef(false);
+  const lastPushRef = useRef(0);
+
+  // Realtime subscription to the current battle_rooms row
+  useEffect(() => {
+    if (!roomId || mode !== "room") return;
+    const channel = supabase
+      .channel(`battle_room:${roomId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "battle_rooms", filter: `id=eq.${roomId}` },
+        (payload) => {
+          const row: any = payload.new;
+          if (isHost) {
+            if (row.guest_name) setOpponent(row.guest_name);
+            setOpponentProgress(Number(row.guest_progress) || 0);
+          } else {
+            if (row.host_name) setOpponent(row.host_name);
+            setOpponentProgress(Number(row.host_progress) || 0);
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId, isHost, mode]);
+
+  // Push my progress upstream while in the arena (room mode only)
+  useEffect(() => {
+    if (phase !== "arena" || mode !== "room" || !roomId) return;
+    const now = Date.now();
+    if (now - lastPushRef.current < 400) return;
+    lastPushRef.current = now;
+    const myProgress = total ? 1 - secondsLeft / total : 0;
+    const patch = isHost
+      ? { host_progress: myProgress }
+      : { guest_progress: myProgress };
+    (supabase as any).from("battle_rooms").update(patch).eq("id", roomId).then(() => {});
+  }, [secondsLeft, phase, mode, roomId, isHost, duration]);
 
   const total = duration * 60;
   const userProgress = total ? 1 - secondsLeft / total : 0;
@@ -91,9 +132,15 @@ function BattleInner() {
       const elapsed = Date.now() - start;
       const left = Math.max(0, total - Math.floor(elapsed / 1000));
       setSecondsLeft(left);
-      const op = Math.min(1, elapsed / opponentTotalMs);
-      // Add subtle jitter so it feels alive
-      setOpponentProgress(op);
+      if (mode !== "room") {
+        const op = Math.min(1, elapsed / opponentTotalMs);
+        setOpponentProgress(op);
+        if (op >= 1) {
+          clearInterval(id);
+          finish("loss");
+          return;
+        }
+      }
 
       // Trash talk every ~12s
       if (Date.now() - lastTrash > 12000 && left > 4) {
@@ -110,18 +157,23 @@ function BattleInner() {
         setTimeout(() => setTrash(null), 3500);
       }
 
-      // End conditions
+      // Win by finishing the timer
       if (left <= 0) {
         clearInterval(id);
         finish("win");
-      } else if (op >= 1) {
-        clearInterval(id);
-        finish("loss");
       }
     }, 250);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  // Room mode: loss when live opponent progress hits 1
+  useEffect(() => {
+    if (phase !== "arena" || mode !== "room") return;
+    if (opponentProgress >= 1) finish("loss");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opponentProgress, phase, mode]);
+
 
   const finish = async (result: Outcome) => {
     if (quitRef.current) return;
@@ -145,8 +197,11 @@ function BattleInner() {
   const startBattle = () => {
     if (mode === "bot") {
       setOpponent(BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)]);
-    } else {
-      setOpponent(roomCode ? `Player ${roomCode.slice(-3).toUpperCase()}` : "Opponent");
+      setRoomId(null);
+      setIsHost(false);
+    } else if (!roomId) {
+      toast.error("Generate or join a room first");
+      return;
     }
     setPhase("countdown");
   };
@@ -157,14 +212,24 @@ function BattleInner() {
     const hostName =
       (user.user_metadata?.display_name as string) ||
       (user.email?.split("@")[0] ?? "Host");
-    const { error } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("battle_rooms")
-      .insert({ code, host_user_id: user.id, host_name: hostName });
-    if (error) {
-      toast.error("Couldn't create room: " + error.message);
+      .insert({
+        code,
+        host_user_id: user.id,
+        host_name: hostName,
+        duration_minutes: duration,
+      })
+      .select("id")
+      .single();
+    if (error || !data) {
+      toast.error("Couldn't create room: " + (error?.message ?? "unknown"));
       return;
     }
     setRoomCode(code);
+    setRoomId(data.id);
+    setIsHost(true);
+    setOpponent("Waiting for opponent…");
     toast.success(`Room ${code} created — share to invite.`);
   };
 
@@ -181,12 +246,15 @@ function BattleInner() {
     setOpponentProgress(0);
     setTrash(null);
     setOpponent("Focus Bot");
+    setRoomId(null);
+    setIsHost(false);
     setPhase("lobby");
     toast("Match abandoned");
     navigate("/battle", { replace: true });
   };
 
   const joinRoom = async () => {
+    if (!user) return;
     const code = roomCode.trim().toUpperCase();
     if (code.length < 4) {
       toast.error("Enter a valid room code");
@@ -194,19 +262,40 @@ function BattleInner() {
     }
     const { data, error } = await (supabase as any)
       .from("battle_rooms")
-      .select("host_name, host_user_id")
+      .select("id, host_name, host_user_id, duration_minutes")
       .eq("code", code)
       .maybeSingle();
     if (error || !data) {
       toast.error("Room not found. Check the code and try again.");
       return;
     }
-    if (user && data.host_user_id === user.id) {
+    if (data.host_user_id === user.id) {
       toast.error("You can't join your own room — share the code with a friend.");
       return;
     }
+    const guestName =
+      (user.user_metadata?.display_name as string) ||
+      (user.email?.split("@")[0] ?? "Guest");
+    const { error: updErr } = await (supabase as any)
+      .from("battle_rooms")
+      .update({
+        guest_user_id: user.id,
+        guest_name: guestName,
+        guest_progress: 0,
+        status: "active",
+      })
+      .eq("id", data.id);
+    if (updErr) {
+      toast.error("Couldn't join room: " + updErr.message);
+      return;
+    }
+    if (data.duration_minutes && [15, 25, 45].includes(data.duration_minutes)) {
+      setDuration(data.duration_minutes as Duration);
+    }
+    setRoomId(data.id);
+    setIsHost(false);
     setOpponent(data.host_name || `Player ${code.slice(-3)}`);
-    toast.success(`Joining ${data.host_name}'s room...`);
+    toast.success(`Joined ${data.host_name}'s room!`);
     setPhase("countdown");
   };
 
