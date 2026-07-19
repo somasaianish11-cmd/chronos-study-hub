@@ -167,6 +167,14 @@ function BattleInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // Room mode: loss when live opponent progress hits 1
+  useEffect(() => {
+    if (phase !== "arena" || mode !== "room") return;
+    if (opponentProgress >= 1) finish("loss");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opponentProgress, phase, mode]);
+
+
   const finish = async (result: Outcome) => {
     if (quitRef.current) return;
     setOutcome(result);
