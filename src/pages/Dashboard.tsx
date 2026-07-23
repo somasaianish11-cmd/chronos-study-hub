@@ -36,17 +36,13 @@ export default function Dashboard() {
       setWeekMinutes((sessions || []).reduce((sum, x: any) => sum + x.duration_minutes, 0));
       setNextExam(exam);
 
-      // leaderboard top 5
-      const wkStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
-      const { data: allSessions } = await supabase.from("study_sessions").select("user_id, duration_minutes").gte("completed_at", wkStart);
-      const totals: Record<string, number> = {};
-      (allSessions || []).forEach((s: any) => { totals[s.user_id] = (totals[s.user_id] || 0) + s.duration_minutes; });
-      const ids = Object.keys(totals);
-      const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
-      const ranked = ids.map(id => ({
-        id, minutes: totals[id],
-        name: profs?.find(p => p.id === id)?.display_name || "Student",
-      })).sort((a, b) => b.minutes - a.minutes).slice(0, 5);
+      // leaderboard top 5 (via SECURITY DEFINER rpc, aggregates all users)
+      const { data: lb } = await supabase.rpc("weekly_leaderboard");
+      const ranked = (lb || []).slice(0, 5).map((r: any) => ({
+        id: r.user_id,
+        minutes: Number(r.total_minutes) || 0,
+        name: r.display_name || "Student",
+      }));
       setLeaders(ranked);
     })();
   }, [user]);
