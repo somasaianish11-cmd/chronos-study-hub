@@ -18,7 +18,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
-    (async () => {
+    const load = async () => {
       const today = new Date().toISOString().slice(0, 10);
       const dow = new Date().getDay();
 
@@ -44,7 +44,13 @@ export default function Dashboard() {
         name: r.display_name || "Student",
       }));
       setLeaders(ranked);
-    })();
+    };
+    load();
+    const channel = supabase
+      .channel(`dash-${user.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "study_sessions" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const daysUntilExam = nextExam ? Math.ceil((new Date(nextExam.exam_date + "T00:00:00").getTime() - new Date(new Date().setHours(0, 0, 0, 0)).getTime()) / 86400000) : 0;
