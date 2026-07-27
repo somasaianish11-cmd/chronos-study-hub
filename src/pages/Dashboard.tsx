@@ -26,7 +26,7 @@ export default function Dashboard() {
         supabase.from("streaks").select("current_streak").eq("user_id", user.id).maybeSingle(),
         supabase.from("homework").select("*, subjects(name, color)").eq("user_id", user.id).eq("due_date", today).eq("completed", false),
         supabase.from("timetable_slots").select("*, subjects(name, color)").eq("user_id", user.id).eq("day_of_week", dow).order("start_time"),
-        supabase.from("study_sessions").select("duration_minutes").eq("user_id", user.id).gte("completed_at", startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString()),
+        supabase.from("study_sessions").select("duration_minutes, completed_at").eq("user_id", user.id).gte("completed_at", startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString()).lte("completed_at", endOfWeek(new Date(), { weekStartsOn: 1 }).toISOString()),
         supabase.from("exams").select("*, subjects(name)").eq("user_id", user.id).gte("exam_date", today).order("exam_date").limit(1).maybeSingle(),
       ]);
 
