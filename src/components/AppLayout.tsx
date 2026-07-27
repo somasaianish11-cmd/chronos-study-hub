@@ -1,12 +1,13 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Timer, Calendar, BookOpen, GraduationCap,
-  Trophy, Swords, Layers, CreditCard, Settings, LogOut, Sparkles
+  Trophy, Swords, Layers, CreditCard, Settings, LogOut, Sparkles, Menu
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
