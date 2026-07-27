@@ -16,7 +16,7 @@ export default function Leaderboard() {
   const [rows, setRows] = useState<any[]>([]);
 
   useEffect(() => {
-    (async () => {
+    const load = async () => {
       const { data, error } = await supabase.rpc("weekly_leaderboard");
       if (error) {
         console.error("[Leaderboard] rpc error", error);
@@ -29,8 +29,15 @@ export default function Leaderboard() {
         minutes: Number(r.total_minutes) || 0,
       }));
       setRows(ranked);
-    })();
-  }, []);
+    };
+    load();
+    if (!user) return;
+    const channel = supabase
+      .channel(`lb-${user.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "study_sessions" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
 
   const max = Math.max(...rows.map((r) => r.minutes), 1);
 
