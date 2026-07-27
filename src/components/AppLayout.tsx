@@ -1,12 +1,13 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Timer, Calendar, BookOpen, GraduationCap,
-  Trophy, Swords, Layers, CreditCard, Settings, LogOut, Sparkles
+  Trophy, Swords, Layers, CreditCard, Settings, LogOut, Sparkles, Menu
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -24,7 +25,11 @@ const nav = [
 export default function AppLayout() {
   const { user, loading, signOut, isPro } = useAuth();
   const nav2 = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState("");
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   useEffect(() => {
     if (!loading && !user) nav2("/login");
@@ -98,23 +103,56 @@ export default function AppLayout() {
           <div className="w-7 h-7 rounded-md gradient-primary flex items-center justify-center"><Timer className="w-3.5 h-3.5 text-primary-foreground" /></div>
           <span className="font-bold">Chronos</span>
         </NavLink>
-        <Button variant="ghost" size="icon" onClick={signOut}><LogOut className="w-4 h-4" /></Button>
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Open menu"><Menu className="w-5 h-5" /></Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-72 p-0 flex flex-col bg-card">
+            <div className="flex items-center gap-2 px-4 py-4 border-b border-border">
+              <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center shadow-glow">
+                <Timer className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <span className="font-bold text-lg tracking-tight">Chronos</span>
+            </div>
+            <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+              {nav.map(({ to, label, icon: Icon, pro }) => (
+                <NavLink key={to} to={to}
+                  className={({ isActive }) => cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                    isActive ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="flex-1">{label}</span>
+                  {pro && !isPro && <Sparkles className="w-3 h-3 text-accent" />}
+                </NavLink>
+              ))}
+              <div className="border-t border-border my-2" />
+              <NavLink to="/pricing" className={({ isActive }) => cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors", isActive ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground")}>
+                <CreditCard className="w-4 h-4" /> Pricing
+              </NavLink>
+              <NavLink to="/settings" className={({ isActive }) => cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors", isActive ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground")}>
+                <Settings className="w-4 h-4" /> Settings
+              </NavLink>
+            </nav>
+            <div className="border-t border-border p-3 flex items-center gap-2">
+              <Avatar className="w-8 h-8"><AvatarFallback className="bg-primary/20 text-primary text-xs font-semibold">{initials}</AvatarFallback></Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{name}</div>
+                <div className="text-xs text-muted-foreground truncate">{isPro ? "Pro" : "Free"}</div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={signOut} className="h-8 w-8" aria-label="Sign out"><LogOut className="w-4 h-4" /></Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       <main className="flex-1 overflow-x-hidden pt-16 md:pt-0">
         <div className="max-w-7xl mx-auto p-6 md:p-8 animate-fade-in">
           <Outlet />
         </div>
-        {/* mobile bottom nav */}
-        <div className="md:hidden fixed bottom-0 inset-x-0 glass border-t border-border flex justify-around p-2 z-40">
-          {nav.slice(0, 5).map(({ to, icon: Icon }) => (
-            <NavLink key={to} to={to} className={({ isActive }) => cn("p-2 rounded-lg", isActive ? "text-primary" : "text-muted-foreground")}>
-              <Icon className="w-5 h-5" />
-            </NavLink>
-          ))}
-        </div>
-        <div className="md:hidden h-16" />
       </main>
+
     </div>
   );
 }
