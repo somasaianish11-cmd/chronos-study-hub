@@ -25,7 +25,11 @@ const nav = [
 export default function AppLayout() {
   const { user, loading, signOut, isPro } = useAuth();
   const nav2 = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState("");
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   useEffect(() => {
     if (!loading && !user) nav2("/login");
