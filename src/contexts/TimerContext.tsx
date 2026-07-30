@@ -60,7 +60,7 @@ const computeSecondsLeft = (p: Persisted): number => {
 };
 
 export function TimerProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, isPro } = useAuth();
   const [state, setState] = useState<Persisted>(() => loadPersisted());
   const [secondsLeft, setSecondsLeft] = useState<number>(() => computeSecondsLeft(loadPersisted()));
   const intRef = useRef<number | null>(null);
@@ -81,15 +81,15 @@ export function TimerProvider({ children }: { children: ReactNode }) {
           subject_id: subjectId || null,
           duration_minutes: durationMin,
         });
-        const newStreak = await bumpStreak(user.id);
+        const { streak, recovered } = await bumpStreak(user.id, isPro);
         toast.success("🍅 Focus session complete!", {
-          description: `+${durationMin} min logged · ${newStreak} day streak`,
+          description: `+${durationMin} min logged · ${streak} day streak${recovered ? " · 🛟 Pro streak recovery used" : ""}`,
         });
       }
     } finally {
       completingRef.current = false;
     }
-  }, [user]);
+  }, [user, isPro]);
 
   // tick loop — derives secondsLeft from endsAt so it survives navigation
   useEffect(() => {
