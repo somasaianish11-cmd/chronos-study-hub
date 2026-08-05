@@ -19,6 +19,15 @@ export const mondayOf = (d: Date) => {
   return dayStr(x);
 };
 
+/** Monday 00:00 UTC of the week containing `d`, as YYYY-MM-DD.
+ *  Used for the Pro streak-recovery allowance, which resets weekly in UTC. */
+export const utcMondayOf = (d: Date) => {
+  const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const diff = (x.getUTCDay() + 6) % 7; // 0 = Monday
+  x.setUTCDate(x.getUTCDate() - diff);
+  return x.toISOString().slice(0, 10);
+};
+
 export type BumpResult = {
   streak: number;
   /** true when a Pro streak recovery was consumed to save the streak */
@@ -36,7 +45,7 @@ export async function bumpStreak(userId: string, isPro = false): Promise<BumpRes
   const today = dayStr(new Date());
   const yesterday = addDays(today, -1);
   const twoDaysAgo = addDays(today, -2);
-  const weekStart = mondayOf(new Date());
+  const weekStart = utcMondayOf(new Date());
 
   const { data: row } = await supabase
     .from("streaks")
