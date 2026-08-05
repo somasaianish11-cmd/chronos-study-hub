@@ -461,6 +461,8 @@ export type Database = {
         Args: never
         Returns: {
           display_name: string
+          joined_at: string
+          session_count: number
           total_minutes: number
           user_id: string
         }[]
