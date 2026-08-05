@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
+import StreakRecoveryBadge from "@/components/StreakRecoveryBadge";
 
 export default function Settings() {
   const { user, isPro, signOut } = useAuth();
@@ -58,9 +59,10 @@ export default function Settings() {
         <Button onClick={save}>Save changes</Button>
       </Card>
 
-      <Card className="p-5 bg-gradient-card border-border space-y-2">
+      <Card className="p-5 bg-gradient-card border-border space-y-3">
         <h2 className="font-semibold">Plan</h2>
         <p className="text-sm text-muted-foreground">You're on the <span className="text-foreground font-medium">{isPro ? "Pro" : "Free"}</span> plan.</p>
+        <StreakRecoveryBadge />
       </Card>
 
       <Card className="p-5 bg-gradient-card border-border">

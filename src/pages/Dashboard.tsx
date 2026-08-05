@@ -6,6 +6,7 @@ import { Flame, BookOpen, Trophy, Calendar, Timer as TimerIcon, GraduationCap } 
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { format, startOfWeek, endOfWeek } from "date-fns";
+import StreakRecoveryBadge from "@/components/StreakRecoveryBadge";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -58,9 +59,12 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Welcome back 👋</h1>
-        <p className="text-muted-foreground">Here's your day at a glance.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold">Welcome back 👋</h1>
+          <p className="text-muted-foreground">Here's your day at a glance.</p>
+        </div>
+        <StreakRecoveryBadge />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
