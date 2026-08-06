@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.apply_session_streak() FROM PUBLIC, anon, authenticated;
