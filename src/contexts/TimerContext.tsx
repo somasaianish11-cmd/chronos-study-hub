@@ -82,6 +82,8 @@ export function TimerProvider({ children }: { children: ReactNode }) {
           duration_minutes: durationMin,
         });
         const { streak, recovered } = await bumpStreak(user.id, isPro);
+        // notify any mounted views (Dashboard, Settings badge) to refresh
+        window.dispatchEvent(new CustomEvent("chronos:session-complete", { detail: { streak, recovered, durationMin } }));
         toast.success("🍅 Focus session complete!", {
           description: `+${durationMin} min logged · ${streak} day streak${recovered ? " · 🛟 Pro streak recovery used" : ""}`,
         });

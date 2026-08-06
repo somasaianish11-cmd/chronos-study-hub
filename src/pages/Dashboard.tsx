@@ -50,8 +50,17 @@ export default function Dashboard() {
     const channel = supabase
       .channel(`dash-${user.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "study_sessions" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "streaks", filter: `user_id=eq.${user.id}` }, () => load())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const onComplete = () => load();
+    window.addEventListener("chronos:session-complete", onComplete);
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener("chronos:session-complete", onComplete);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [user]);
 
   const daysUntilExam = nextExam ? Math.ceil((new Date(nextExam.exam_date + "T00:00:00").getTime() - new Date(new Date().setHours(0, 0, 0, 0)).getTime()) / 86400000) : 0;
