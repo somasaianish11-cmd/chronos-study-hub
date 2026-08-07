@@ -81,12 +81,13 @@ export function TimerProvider({ children }: { children: ReactNode }) {
           subject_id: subjectId || null,
           duration_minutes: durationMin,
         });
-        const { streak, recovered } = await bumpStreak(user.id, isPro);
-        // notify any mounted views (Dashboard, Settings badge) to refresh
-        window.dispatchEvent(new CustomEvent("chronos:session-complete", { detail: { streak, recovered, durationMin } }));
+        // Streaks are owned solely by the DB trigger apply_session_streak().
+        // Notify mounted views to re-read from the database (single source of truth).
+        window.dispatchEvent(new CustomEvent("chronos:session-complete", { detail: { durationMin } }));
         toast.success("🍅 Focus session complete!", {
-          description: `+${durationMin} min logged · ${streak} day streak${recovered ? " · 🛟 Pro streak recovery used" : ""}`,
+          description: `+${durationMin} min logged`,
         });
+
       }
     } finally {
       completingRef.current = false;
