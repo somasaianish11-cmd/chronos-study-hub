@@ -75,11 +75,20 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     completingRef.current = true;
     try {
       if (user) {
-        await supabase.from("study_sessions").insert({
-          user_id: user.id,
-          subject_id: subjectId || null,
-          duration_minutes: durationMin,
-        });
+        const { data, error } = await supabase
+          .from("study_sessions")
+          .insert({
+            user_id: user.id,
+            subject_id: subjectId || null,
+            duration_minutes: durationMin,
+          })
+          .select()
+          .maybeSingle();
+        console.log("[Chronos] session insert", { data, error });
+        if (error) {
+          toast.error("Couldn't save your session", { description: error.message });
+          return;
+        }
         // Streaks are owned solely by the DB trigger apply_session_streak().
         // Notify mounted views to re-read from the database (single source of truth).
         window.dispatchEvent(new CustomEvent("chronos:session-complete", { detail: { durationMin } }));
