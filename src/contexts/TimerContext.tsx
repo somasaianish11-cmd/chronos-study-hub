@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { bumpStreak } from "@/lib/streaks";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "chronos.timer.v1";
@@ -60,7 +59,7 @@ const computeSecondsLeft = (p: Persisted): number => {
 };
 
 export function TimerProvider({ children }: { children: ReactNode }) {
-  const { user, isPro } = useAuth();
+  const { user } = useAuth();
   const [state, setState] = useState<Persisted>(() => loadPersisted());
   const [secondsLeft, setSecondsLeft] = useState<number>(() => computeSecondsLeft(loadPersisted()));
   const intRef = useRef<number | null>(null);
@@ -81,17 +80,18 @@ export function TimerProvider({ children }: { children: ReactNode }) {
           subject_id: subjectId || null,
           duration_minutes: durationMin,
         });
-        const { streak, recovered } = await bumpStreak(user.id, isPro);
-        // notify any mounted views (Dashboard, Settings badge) to refresh
-        window.dispatchEvent(new CustomEvent("chronos:session-complete", { detail: { streak, recovered, durationMin } }));
+        // Streaks are owned solely by the DB trigger apply_session_streak().
+        // Notify mounted views to re-read from the database (single source of truth).
+        window.dispatchEvent(new CustomEvent("chronos:session-complete", { detail: { durationMin } }));
         toast.success("🍅 Focus session complete!", {
-          description: `+${durationMin} min logged · ${streak} day streak${recovered ? " · 🛟 Pro streak recovery used" : ""}`,
+          description: `+${durationMin} min logged`,
         });
+
       }
     } finally {
       completingRef.current = false;
     }
-  }, [user, isPro]);
+  }, [user]);
 
   // tick loop — derives secondsLeft from endsAt so it survives navigation
   useEffect(() => {

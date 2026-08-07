@@ -52,18 +52,12 @@ export default function Dashboard() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "study_sessions" }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "streaks", filter: `user_id=eq.${user.id}` }, () => load())
       .subscribe();
-    const onComplete = (event: Event) => {
-      const detail = (event as CustomEvent<{ streak?: number }>).detail;
-
-      // TimerContext includes the newly calculated streak in this event, so
-      // update the card immediately while the database/realtime update settles.
-      if (typeof detail?.streak === "number") {
-        setStreak(detail.streak);
-      }
-
-      // Re-fetch shortly afterward to reconcile the UI with the persisted row.
-      window.setTimeout(() => void load(), 300);
+    // The DB trigger apply_session_streak() is the single source of truth.
+    // On completion we simply re-read it (a few retries cover trigger latency).
+    const onComplete = () => {
+      [200, 800, 2000].forEach((ms) => window.setTimeout(() => void load(), ms));
     };
+
     window.addEventListener("chronos:session-complete", onComplete);
     const onVisible = () => { if (document.visibilityState === "visible") load(); };
     document.addEventListener("visibilitychange", onVisible);
