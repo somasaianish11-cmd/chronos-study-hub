@@ -59,7 +59,7 @@ const computeSecondsLeft = (p: Persisted): number => {
 };
 
 export function TimerProvider({ children }: { children: ReactNode }) {
-  const { user, isPro } = useAuth();
+  const { user } = useAuth();
   const [state, setState] = useState<Persisted>(() => loadPersisted());
   const [secondsLeft, setSecondsLeft] = useState<number>(() => computeSecondsLeft(loadPersisted()));
   const intRef = useRef<number | null>(null);
@@ -91,7 +91,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     } finally {
       completingRef.current = false;
     }
-  }, [user, isPro]);
+  }, [user]);
 
   // tick loop — derives secondsLeft from endsAt so it survives navigation
   useEffect(() => {
