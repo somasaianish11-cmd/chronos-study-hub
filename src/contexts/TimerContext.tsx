@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { bumpStreak } from "@/lib/streaks";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "chronos.timer.v1";
