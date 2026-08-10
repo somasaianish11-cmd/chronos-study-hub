@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { authRedirectTo } from "@/lib/authRedirect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +35,7 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
       if (mode === "signup") {
         const response = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: `${window.location.origin}/dashboard`, data: { display_name: name || email.split("@")[0] } },
+          options: { emailRedirectTo: authRedirectTo("/dashboard"), data: { display_name: name || email.split("@")[0] } },
         });
         
         if (response.error) throw response.error;
@@ -54,7 +55,7 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
   };
 
   const handleGoogle = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: `${window.location.origin}/dashboard` });
+    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: authRedirectTo("/") });
     if (result.error) toast.error("Google sign-in failed");
     if (!result.redirected && !result.error) nav("/dashboard");
   };
