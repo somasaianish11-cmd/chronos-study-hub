@@ -29,8 +29,14 @@ export default function Settings() {
 
   const save = async () => {
     if (!user) return;
-    const { error } = await supabase.from("profiles").update({ display_name: name }).eq("id", user.id);
+    const validation = validateDisplayName(name);
+    if (!validation.valid) {
+      return toast.error(validation.error || "Invalid display name");
+    }
+    const trimmed = name.trim();
+    const { error } = await supabase.from("profiles").update({ display_name: trimmed }).eq("id", user.id);
     if (error) return toast.error(error.message);
+    setName(trimmed);
     toast.success("Profile updated");
   };
 
