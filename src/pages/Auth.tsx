@@ -90,7 +90,16 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
 
           <form onSubmit={handleEmail} className="space-y-3">
             {mode === "signup" && (
-              <div><Label htmlFor="name">Name</Label><Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="Alex" /></div>
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={e => { setName(e.target.value); setNameError(""); }}
+                  placeholder="Alex"
+                />
+                {nameError && <p className="text-sm text-destructive mt-1">{nameError}</p>}
+              </div>
             )}
             <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@school.edu" /></div>
             <div>
