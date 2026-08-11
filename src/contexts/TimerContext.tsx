@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode, useC
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { localStudyDate } from "@/lib/studyDate";
 
 const STORAGE_KEY = "chronos.timer.v1";
 
@@ -93,7 +92,6 @@ export function TimerProvider({ children }: { children: ReactNode }) {
             user_id: user.id,
             subject_id: safeSubjectId,
             duration_minutes: durationMin,
-            study_date: localStudyDate(),
           })
           .select()
           .maybeSingle();
