@@ -329,6 +329,7 @@ export type Database = {
           completed_at: string
           duration_minutes: number
           id: string
+          study_date: string
           subject_id: string | null
           user_id: string
         }
@@ -336,6 +337,7 @@ export type Database = {
           completed_at?: string
           duration_minutes: number
           id?: string
+          study_date?: string
           subject_id?: string | null
           user_id: string
         }
@@ -343,6 +345,7 @@ export type Database = {
           completed_at?: string
           duration_minutes?: number
           id?: string
+          study_date?: string
           subject_id?: string | null
           user_id?: string
         }
