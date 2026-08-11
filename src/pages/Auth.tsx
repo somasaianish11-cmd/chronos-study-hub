@@ -16,6 +16,7 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [nameError, setNameError] = useState("");
   const nav = useNavigate();
 
   const validatePassword = (pwd: string) => {
