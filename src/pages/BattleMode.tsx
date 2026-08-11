@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { localStudyDate } from "@/lib/studyDate";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -188,6 +189,7 @@ function BattleInner() {
         user_id: user.id,
         duration_minutes: duration,
         completed_at: new Date().toISOString(),
+        study_date: localStudyDate(),
       });
       if (error) toast.error("Couldn't save session: " + error.message);
       else toast.success(`Victory! +${duration}m logged to leaderboard.`);
