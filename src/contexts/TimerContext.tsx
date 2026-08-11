@@ -75,11 +75,22 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     completingRef.current = true;
     try {
       if (user) {
+        let safeSubjectId: string | null = null;
+        if (subjectId && subjectId.trim() !== "") {
+          const { data: subject } = await supabase
+            .from("subjects")
+            .select("id")
+            .eq("id", subjectId)
+            .eq("user_id", user.id)
+            .maybeSingle();
+          safeSubjectId = subject ? subject.id : null;
+        }
+
         const { data, error } = await supabase
           .from("study_sessions")
           .insert({
             user_id: user.id,
-            subject_id: subjectId || null,
+            subject_id: safeSubjectId,
             duration_minutes: durationMin,
           })
           .select()
