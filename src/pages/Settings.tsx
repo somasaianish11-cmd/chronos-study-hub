@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { validateDisplayName } from "@/lib/profanity";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,8 +29,14 @@ export default function Settings() {
 
   const save = async () => {
     if (!user) return;
-    const { error } = await supabase.from("profiles").update({ display_name: name }).eq("id", user.id);
+    const validation = validateDisplayName(name);
+    if (!validation.valid) {
+      return toast.error(validation.error || "Invalid display name");
+    }
+    const trimmed = name.trim();
+    const { error } = await supabase.from("profiles").update({ display_name: trimmed }).eq("id", user.id);
     if (error) return toast.error(error.message);
+    setName(trimmed);
     toast.success("Profile updated");
   };
 

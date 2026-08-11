@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { authRedirectTo } from "@/lib/authRedirect";
+import { validateDisplayName } from "@/lib/profanity";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [nameError, setNameError] = useState("");
   const nav = useNavigate();
 
   const validatePassword = (pwd: string) => {
@@ -26,16 +28,21 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
   const handleEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (mode === "signup") {
-      const error = validatePassword(password);
-      setPasswordError(error);
-      if (error) return;
+      const pwdError = validatePassword(password);
+      setPasswordError(pwdError);
+
+      const displayName = name.trim() || email.split("@")[0];
+      const nameValidation = validateDisplayName(displayName);
+      setNameError(nameValidation.valid ? "" : nameValidation.error || "");
+      if (!nameValidation.valid || pwdError) return;
     }
     setLoading(true);
     try {
       if (mode === "signup") {
+        const displayName = name.trim() || email.split("@")[0];
         const response = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: authRedirectTo("/dashboard"), data: { display_name: name || email.split("@")[0] } },
+          options: { emailRedirectTo: authRedirectTo("/dashboard"), data: { display_name: displayName } },
         });
         
         if (response.error) throw response.error;
@@ -84,7 +91,16 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
 
           <form onSubmit={handleEmail} className="space-y-3">
             {mode === "signup" && (
-              <div><Label htmlFor="name">Name</Label><Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="Alex" /></div>
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={e => { setName(e.target.value); setNameError(""); }}
+                  placeholder="Alex"
+                />
+                {nameError && <p className="text-sm text-destructive mt-1">{nameError}</p>}
+              </div>
             )}
             <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@school.edu" /></div>
             <div>
