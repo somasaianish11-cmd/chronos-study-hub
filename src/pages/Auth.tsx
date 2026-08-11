@@ -28,9 +28,13 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
   const handleEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (mode === "signup") {
-      const error = validatePassword(password);
-      setPasswordError(error);
-      if (error) return;
+      const pwdError = validatePassword(password);
+      setPasswordError(pwdError);
+
+      const displayName = name.trim() || email.split("@")[0];
+      const nameValidation = validateDisplayName(displayName);
+      setNameError(nameValidation.valid ? "" : nameValidation.error || "");
+      if (!nameValidation.valid || pwdError) return;
     }
     setLoading(true);
     try {
