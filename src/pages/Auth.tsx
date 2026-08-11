@@ -39,9 +39,10 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
     setLoading(true);
     try {
       if (mode === "signup") {
+        const displayName = name.trim() || email.split("@")[0];
         const response = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: authRedirectTo("/dashboard"), data: { display_name: name || email.split("@")[0] } },
+          options: { emailRedirectTo: authRedirectTo("/dashboard"), data: { display_name: displayName } },
         });
         
         if (response.error) throw response.error;
