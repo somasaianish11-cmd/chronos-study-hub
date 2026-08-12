@@ -59,7 +59,7 @@ const computeSecondsLeft = (p: Persisted): number => {
 };
 
 export function TimerProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const [state, setState] = useState<Persisted>(() => loadPersisted());
   const [secondsLeft, setSecondsLeft] = useState<number>(() => computeSecondsLeft(loadPersisted()));
   const intRef = useRef<number | null>(null);
@@ -103,6 +103,8 @@ export function TimerProvider({ children }: { children: ReactNode }) {
         // Streaks are owned solely by the DB trigger apply_session_streak().
         // Notify mounted views to re-read from the database (single source of truth).
         window.dispatchEvent(new CustomEvent("chronos:session-complete", { detail: { durationMin } }));
+        // Refresh the user's profile so any UI derived from profiles stays current.
+        await refreshProfile();
         toast.success("🍅 Focus session complete!", {
           description: `+${durationMin} min logged`,
         });
@@ -111,7 +113,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     } finally {
       completingRef.current = false;
     }
-  }, [user]);
+  }, [user, refreshProfile]);
 
   // tick loop — derives secondsLeft from endsAt so it survives navigation
   useEffect(() => {
