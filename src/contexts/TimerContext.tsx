@@ -86,12 +86,16 @@ export function TimerProvider({ children }: { children: ReactNode }) {
           safeSubjectId = subject ? subject.id : null;
         }
 
+        // Local calendar day (YYYY-MM-DD) in the learner's own timezone.
+        const localDate = new Date().toLocaleDateString("en-CA");
+
         const { data, error } = await supabase
           .from("study_sessions")
           .insert({
             user_id: user.id,
             subject_id: safeSubjectId,
             duration_minutes: durationMin,
+            study_date: localDate,
           })
           .select()
           .maybeSingle();
