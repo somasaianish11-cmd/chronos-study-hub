@@ -96,7 +96,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
             subject_id: safeSubjectId,
             duration_minutes: durationMin,
             local_date: localDate,
-          })
+          } as any)
           .select()
           .maybeSingle();
         console.log("[Chronos] session insert", { data, error });
