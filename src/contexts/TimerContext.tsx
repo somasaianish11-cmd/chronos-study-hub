@@ -95,7 +95,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
             user_id: user.id,
             subject_id: safeSubjectId,
             duration_minutes: durationMin,
-            study_date: localDate,
+            local_date: localDate,
           })
           .select()
           .maybeSingle();
