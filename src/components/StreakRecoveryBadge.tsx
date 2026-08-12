@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { utcMondayOf } from "@/lib/streaks";
@@ -10,7 +10,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
   const { user, isPro } = useAuth();
   const [used, setUsed] = useState<boolean | null>(null);
 
-  useEffect(() => {
+  const fetchUsed = useCallback(() => {
     if (!user || !isPro) return;
     let active = true;
     supabase
@@ -23,6 +23,16 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       });
     return () => { active = false; };
   }, [user, isPro]);
+
+  useEffect(() => {
+    const cleanup = fetchUsed();
+    const onComplete = () => fetchUsed();
+    window.addEventListener("chronos:session-complete", onComplete);
+    return () => {
+      cleanup?.();
+      window.removeEventListener("chronos:session-complete", onComplete);
+    };
+  }, [fetchUsed]);
 
   if (!isPro || used === null) return null;
 
