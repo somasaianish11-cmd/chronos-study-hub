@@ -48,12 +48,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const loadProfile = async (uid: string) => {
+    // Select "*" so the query never 400s on a column that doesn't exist in this
+    // project's profiles table. Extra columns are simply ignored by the app.
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, display_name, email, created_at")
+      .select("*")
       .eq("id", uid)
       .maybeSingle();
     console.log("[Auth] Profile fetch for user:", uid, { data, error });
+    if (error) {
+      console.error("[Auth] Profile fetch failed:", error.message, error.details, error.hint);
+      return;
+    }
     if (data) setProfile(data as unknown as Profile);
   };
 
