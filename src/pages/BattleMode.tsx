@@ -72,24 +72,33 @@ function BattleInner() {
     if (!roomId) return;
     let cancelled = false;
 
-    const applyRow = (row: any) => {
+    const applyRow = (row: any, source: string) => {
       if (!row || cancelled) return;
+      const next = Math.min(
+        1,
+        Number(isHostRef.current ? row.guest_progress : row.host_progress) || 0
+      );
+      console.log(`[Battle][${source}] row:`, row, "isHost:", isHostRef.current, "-> opponentProgress:", next);
       if (isHostRef.current) {
         if (row.guest_name) setOpponent(row.guest_name);
-        setOpponentProgress(Math.min(1, Number(row.guest_progress) || 0));
       } else {
         if (row.host_name) setOpponent(row.host_name);
-        setOpponentProgress(Math.min(1, Number(row.host_progress) || 0));
       }
+      setOpponentProgress((prev) => {
+        if (prev !== next) console.log(`[Battle][${source}] state update ${prev} -> ${next}`);
+        return next;
+      });
     };
 
     const fetchRow = async () => {
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("battle_rooms")
         .select("id, host_name, guest_name, host_progress, guest_progress, status")
         .eq("id", roomId)
         .maybeSingle();
-      applyRow(data);
+      if (error) console.error("[Battle][poll] fetch failed:", error.message);
+      else console.log("[Battle][poll] fetched row:", data);
+      applyRow(data, "poll");
     };
 
     // Seed immediately so the opponent isn't stuck at 0 before the first event
@@ -100,9 +109,12 @@ function BattleInner() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "battle_rooms", filter: `id=eq.${roomId}` },
-        (payload) => applyRow(payload.new)
+        (payload) => {
+          console.log("[Battle][realtime] payload.new:", payload.new);
+          applyRow(payload.new, "realtime");
+        }
       )
-      .subscribe();
+      .subscribe((status) => console.log("[Battle][realtime] channel status:", status, "room:", roomId));
 
     // Fallback poll in case realtime is unavailable on the row
     const poll = setInterval(fetchRow, 2000);
@@ -126,12 +138,17 @@ function BattleInner() {
       const patch = isHostRef.current
         ? { host_progress: myProgress, updated_at: new Date().toISOString() }
         : { guest_progress: myProgress, updated_at: new Date().toISOString() };
-      const { error } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("battle_rooms")
         .update(patch)
-        .eq("id", roomId);
-      if (error) console.error("[Battle] progress push failed:", error.message);
+        .eq("id", roomId)
+        .select("id, host_progress, guest_progress");
+      if (error) console.error("[Battle][push] failed:", error.message, patch);
+      else if (!data || data.length === 0)
+        console.warn("[Battle][push] update matched 0 rows (RLS or wrong room id):", roomId, patch);
+      else console.log("[Battle][push] wrote:", patch, "-> row now:", data[0]);
     };
+
 
     push();
     const id = setInterval(push, 1000);
