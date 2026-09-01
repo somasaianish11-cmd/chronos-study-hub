@@ -1,6 +1,7 @@
 // Supabase client — points at the personal project `cinoylgjkhrowcpwfgpq`.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
+import { brokeredPreviewStorage } from './previewAuthStorage';
 
 const SUPABASE_URL = "https://cinoylgjkhrowcpwfgpq.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NtGbo3JrZoWhmiWO48rOyw_T64p3zcP";
@@ -10,7 +11,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NtGbo3JrZoWhmiWO48rOyw_T64p3zcP
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
+    storage: brokeredPreviewStorage(),
     persistSession: true,
     autoRefreshToken: true,
   }
