@@ -59,43 +59,85 @@ function BattleInner() {
   const quitRef = useRef(false);
   const lastPushRef = useRef(0);
 
-  // Realtime subscription to the current battle_rooms row
+  // Keep latest values available to intervals without re-subscribing
+  const isHostRef = useRef(isHost);
+  isHostRef.current = isHost;
+  const secondsLeftRef = useRef(secondsLeft);
+  secondsLeftRef.current = secondsLeft;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+
+  // Live sync of the current battle_rooms row (realtime + polling fallback)
   useEffect(() => {
-    if (!roomId || mode !== "room") return;
+    if (!roomId) return;
+    let cancelled = false;
+
+    const applyRow = (row: any) => {
+      if (!row || cancelled) return;
+      if (isHostRef.current) {
+        if (row.guest_name) setOpponent(row.guest_name);
+        setOpponentProgress(Math.min(1, Number(row.guest_progress) || 0));
+      } else {
+        if (row.host_name) setOpponent(row.host_name);
+        setOpponentProgress(Math.min(1, Number(row.host_progress) || 0));
+      }
+    };
+
+    const fetchRow = async () => {
+      const { data } = await (supabase as any)
+        .from("battle_rooms")
+        .select("id, host_name, guest_name, host_progress, guest_progress, status")
+        .eq("id", roomId)
+        .maybeSingle();
+      applyRow(data);
+    };
+
+    // Seed immediately so the opponent isn't stuck at 0 before the first event
+    fetchRow();
+
     const channel = supabase
       .channel(`battle_room:${roomId}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "battle_rooms", filter: `id=eq.${roomId}` },
-        (payload) => {
-          const row: any = payload.new;
-          if (isHost) {
-            if (row.guest_name) setOpponent(row.guest_name);
-            setOpponentProgress(Number(row.guest_progress) || 0);
-          } else {
-            if (row.host_name) setOpponent(row.host_name);
-            setOpponentProgress(Number(row.host_progress) || 0);
-          }
-        }
+        (payload) => applyRow(payload.new)
       )
       .subscribe();
+
+    // Fallback poll in case realtime is unavailable on the row
+    const poll = setInterval(fetchRow, 2000);
+
     return () => {
+      cancelled = true;
+      clearInterval(poll);
       supabase.removeChannel(channel);
     };
-  }, [roomId, isHost, mode]);
+  }, [roomId]);
 
   // Push my progress upstream while in the arena (room mode only)
   useEffect(() => {
-    if (phase !== "arena" || mode !== "room" || !roomId) return;
-    const now = Date.now();
-    if (now - lastPushRef.current < 400) return;
-    lastPushRef.current = now;
-    const myProgress = total ? 1 - secondsLeft / total : 0;
-    const patch = isHost
-      ? { host_progress: myProgress }
-      : { guest_progress: myProgress };
-    (supabase as any).from("battle_rooms").update(patch).eq("id", roomId).then(() => {});
-  }, [secondsLeft, phase, mode, roomId, isHost, duration]);
+    if (phase !== "arena" || !roomId) return;
+    const totalSecs = duration * 60;
+
+    const push = async () => {
+      const myProgress = totalSecs
+        ? Math.min(1, Math.max(0, 1 - secondsLeftRef.current / totalSecs))
+        : 0;
+      const patch = isHostRef.current
+        ? { host_progress: myProgress, updated_at: new Date().toISOString() }
+        : { guest_progress: myProgress, updated_at: new Date().toISOString() };
+      const { error } = await (supabase as any)
+        .from("battle_rooms")
+        .update(patch)
+        .eq("id", roomId);
+      if (error) console.error("[Battle] progress push failed:", error.message);
+    };
+
+    push();
+    const id = setInterval(push, 1000);
+    return () => clearInterval(id);
+  }, [phase, roomId, duration]);
+
 
   const total = duration * 60;
   const userProgress = total ? 1 - secondsLeft / total : 0;
