@@ -62,9 +62,15 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
   };
 
   const handleGoogle = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: authRedirectTo("/") });
-    if (result.error) toast.error("Google sign-in failed");
-    if (!result.redirected && !result.error) nav("/dashboard");
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: "https://chronos-study-app.vercel.app" },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      toast.error(err.message || "Google sign-in failed");
+    }
   };
 
   return (
