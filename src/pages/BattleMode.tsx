@@ -62,6 +62,8 @@ function BattleInner() {
   // Keep latest values available to intervals without re-subscribing
   const isHostRef = useRef(isHost);
   isHostRef.current = isHost;
+  const userIdRef = useRef(user?.id ?? null);
+  userIdRef.current = user?.id ?? null;
   const secondsLeftRef = useRef(secondsLeft);
   secondsLeftRef.current = secondsLeft;
   const phaseRef = useRef(phase);
@@ -74,12 +76,20 @@ function BattleInner() {
 
     const applyRow = (row: any, source: string) => {
       if (!row || cancelled) return;
+      // Determine role from the row itself: compare current user id to host_user_id.
+      // Never trust local state alone — a stale isHost flag leaves opponent at 0.
+      const myId = userIdRef.current;
+      const amHost = row.host_user_id ? row.host_user_id === myId : isHostRef.current;
+      if (row.host_user_id && amHost !== isHostRef.current) {
+        isHostRef.current = amHost;
+        setIsHost(amHost);
+      }
       const next = Math.min(
         1,
-        Number(isHostRef.current ? row.guest_progress : row.host_progress) || 0
+        Number(amHost ? row.guest_progress : row.host_progress) || 0
       );
-      console.log(`[Battle][${source}] row:`, row, "isHost:", isHostRef.current, "-> opponentProgress:", next);
-      if (isHostRef.current) {
+      console.log(`[Battle][${source}] row:`, row, "amHost:", amHost, "-> opponentProgress:", next);
+      if (amHost) {
         if (row.guest_name) setOpponent(row.guest_name);
       } else {
         if (row.host_name) setOpponent(row.host_name);
@@ -93,7 +103,7 @@ function BattleInner() {
     const fetchRow = async () => {
       const { data, error } = await (supabase as any)
         .from("battle_rooms")
-        .select("id, host_name, guest_name, host_progress, guest_progress, status")
+        .select("id, host_user_id, guest_user_id, host_name, guest_name, host_progress, guest_progress, status")
         .eq("id", roomId)
         .maybeSingle();
       if (error) console.error("[Battle][poll] fetch failed:", error.message);
@@ -143,10 +153,21 @@ function BattleInner() {
         .update(patch)
         .eq("id", roomId)
         .select("id, host_progress, guest_progress");
-      if (error) console.error("[Battle][push] failed:", error.message, patch);
-      else if (!data || data.length === 0)
+      if (error) {
+        console.error("[Battle][push] failed:", error.message, patch);
+      } else if (!data || data.length === 0) {
         console.warn("[Battle][push] update matched 0 rows (RLS or wrong room id):", roomId, patch);
-      else console.log("[Battle][push] wrote:", patch, "-> row now:", data[0]);
+        // Fallback: plain write without .select() — some RLS setups allow the
+        // UPDATE but block the implicit SELECT of returned rows.
+        const { error: fbErr } = await (supabase as any)
+          .from("battle_rooms")
+          .update(patch)
+          .eq("id", roomId);
+        if (fbErr) console.error("[Battle][push] fallback write failed:", fbErr.message, patch);
+        else console.log("[Battle][push] fallback write sent:", patch);
+      } else {
+        console.log("[Battle][push] wrote:", patch, "-> row now:", data[0]);
+      }
     };
 
 
@@ -350,6 +371,17 @@ function BattleInner() {
     }
     if (data.duration_minutes && [15, 25, 45].includes(data.duration_minutes)) {
       setDuration(data.duration_minutes as Duration);
+    }
+    // Immediate initial fetch so opponent progress seeds from the database
+    // instead of defaulting to 0 while waiting for the first realtime event.
+    const { data: seed } = await (supabase as any)
+      .from("battle_rooms")
+      .select("id, host_user_id, guest_user_id, host_name, guest_name, host_progress, guest_progress, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (seed) {
+      console.log("[Battle][join] initial row:", seed);
+      setOpponentProgress(Math.min(1, Number(seed.host_progress) || 0));
     }
     setRoomId(data.id);
     setIsHost(false);
