@@ -153,10 +153,21 @@ function BattleInner() {
         .update(patch)
         .eq("id", roomId)
         .select("id, host_progress, guest_progress");
-      if (error) console.error("[Battle][push] failed:", error.message, patch);
-      else if (!data || data.length === 0)
+      if (error) {
+        console.error("[Battle][push] failed:", error.message, patch);
+      } else if (!data || data.length === 0) {
         console.warn("[Battle][push] update matched 0 rows (RLS or wrong room id):", roomId, patch);
-      else console.log("[Battle][push] wrote:", patch, "-> row now:", data[0]);
+        // Fallback: plain write without .select() — some RLS setups allow the
+        // UPDATE but block the implicit SELECT of returned rows.
+        const { error: fbErr } = await (supabase as any)
+          .from("battle_rooms")
+          .update(patch)
+          .eq("id", roomId);
+        if (fbErr) console.error("[Battle][push] fallback write failed:", fbErr.message, patch);
+        else console.log("[Battle][push] fallback write sent:", patch);
+      } else {
+        console.log("[Battle][push] wrote:", patch, "-> row now:", data[0]);
+      }
     };
 
 
