@@ -372,6 +372,17 @@ function BattleInner() {
     if (data.duration_minutes && [15, 25, 45].includes(data.duration_minutes)) {
       setDuration(data.duration_minutes as Duration);
     }
+    // Immediate initial fetch so opponent progress seeds from the database
+    // instead of defaulting to 0 while waiting for the first realtime event.
+    const { data: seed } = await (supabase as any)
+      .from("battle_rooms")
+      .select("id, host_user_id, guest_user_id, host_name, guest_name, host_progress, guest_progress, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (seed) {
+      console.log("[Battle][join] initial row:", seed);
+      setOpponentProgress(Math.min(1, Number(seed.host_progress) || 0));
+    }
     setRoomId(data.id);
     setIsHost(false);
     setOpponent(data.host_name || `Player ${code.slice(-3)}`);
