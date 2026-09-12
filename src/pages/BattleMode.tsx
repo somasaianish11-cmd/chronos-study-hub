@@ -145,9 +145,11 @@ function BattleInner() {
       const myProgress = totalSecs
         ? Math.min(1, Math.max(0, 1 - secondsLeftRef.current / totalSecs))
         : 0;
+      // Supabase expects INTEGER percentages (0..100), not floats like 0.0053.
+      const progressPct = Math.min(100, Math.max(0, Math.round(myProgress * 100)));
       const patch = isHostRef.current
-        ? { host_progress: myProgress, updated_at: new Date().toISOString() }
-        : { guest_progress: myProgress, updated_at: new Date().toISOString() };
+        ? { host_progress: progressPct, updated_at: new Date().toISOString() }
+        : { guest_progress: progressPct, updated_at: new Date().toISOString() };
       const { data, error } = await (supabase as any)
         .from("battle_rooms")
         .update(patch)
