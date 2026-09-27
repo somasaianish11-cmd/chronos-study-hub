@@ -13,13 +13,16 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
   const fetchUsed = useCallback(() => {
     if (!user || !isPro) return;
     let active = true;
+    // select("*") so a missing optional column never 400s; null row = not used.
     supabase
       .from("streaks")
-      .select("recovery_used_week")
+      .select("*")
       .eq("user_id", user.id)
       .maybeSingle()
-      .then(({ data }) => {
-        if (active) setUsed(data?.recovery_used_week === utcMondayOf(new Date()));
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) { console.warn("[Streak] recovery fetch failed:", error.message); setUsed(false); return; }
+        setUsed((data as any)?.recovery_used_week === utcMondayOf(new Date()));
       });
     return () => { active = false; };
   }, [user, isPro]);
