@@ -68,7 +68,11 @@ export default function Auth({ mode }: { mode: "login" | "signup" }) {
       });
       if (error) throw error;
     } catch (err: any) {
-      toast.error(err.message || "Google sign-in failed");
+      console.error("[Auth] Google sign-in failed:", err);
+      try { await supabase.auth.signOut({ scope: "local" }); } catch { /* ignore */ }
+      const msg = String(err?.message || "");
+      toast.error(/fetch|gateway|network|50\d/i.test(msg) ? "Session expired, please sign in again" : msg || "Google sign-in failed");
+      if (mode !== "login") nav("/login");
     }
   };
 

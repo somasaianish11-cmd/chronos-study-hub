@@ -114,25 +114,44 @@ function BattleInner() {
     // Seed immediately so the opponent isn't stuck at 0 before the first event
     fetchRow();
 
-    const channel = supabase
-      .channel(`battle_room:${roomId}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "battle_rooms", filter: `id=eq.${roomId}` },
-        (payload) => {
-          console.log("[Battle][realtime] payload.new:", payload.new);
-          applyRow(payload.new, "realtime");
-        }
-      )
-      .subscribe((status) => console.log("[Battle][realtime] channel status:", status, "room:", roomId));
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let retryTimer: number | undefined;
+    let attempt = 0;
 
-    // Fallback poll in case realtime is unavailable on the row
+    const subscribe = () => {
+      if (cancelled) return;
+      if (channel) { supabase.removeChannel(channel); channel = null; }
+      channel = supabase
+        .channel(`battle_room:${roomId}:${Date.now()}`)
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "battle_rooms", filter: `id=eq.${roomId}` },
+          (payload) => {
+            console.log("[Battle][realtime] payload.new:", payload.new);
+            applyRow(payload.new, "realtime");
+          }
+        )
+        .subscribe((status) => {
+          console.log("[Battle][realtime] channel status:", status, "room:", roomId);
+          if (status === "SUBSCRIBED") attempt = 0;
+          if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT") && !cancelled) {
+            const delay = Math.min(15000, 1000 * 2 ** attempt++);
+            console.warn(`[Battle][realtime] ${status} — reconnecting in ${delay}ms`);
+            window.clearTimeout(retryTimer);
+            retryTimer = window.setTimeout(subscribe, delay);
+          }
+        });
+    };
+    subscribe();
+
+    // Fallback poll keeps running regardless of realtime state
     const poll = setInterval(fetchRow, 2000);
 
     return () => {
       cancelled = true;
       clearInterval(poll);
-      supabase.removeChannel(channel);
+      window.clearTimeout(retryTimer);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [roomId]);
 
@@ -146,7 +165,7 @@ function BattleInner() {
         ? Math.min(1, Math.max(0, 1 - secondsLeftRef.current / totalSecs))
         : 0;
       // Supabase expects INTEGER percentages (0..100), not floats like 0.0053.
-      const progressPct = Math.min(100, Math.max(0, Math.round(myProgress * 100)));
+      const progressPct = Math.round(Math.min(100, Math.max(0, (myProgress * 100) || 0)));
       const patch = isHostRef.current
         ? { host_progress: progressPct, updated_at: new Date().toISOString() }
         : { guest_progress: progressPct, updated_at: new Date().toISOString() };

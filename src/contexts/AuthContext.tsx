@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Subscription {
   user_id?: string;
@@ -78,15 +79,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) {
-        loadSubscription(s.user.id);
-        loadProfile(s.user.id);
+    const failOAuth = async (reason: unknown) => {
+      console.error("[Auth] OAuth/session recovery failed:", reason);
+      try { await supabase.auth.signOut({ scope: "local" }); } catch { /* ignore */ }
+      try {
+        Object.keys(localStorage).filter(k => k.startsWith("sb-")).forEach(k => localStorage.removeItem(k));
+        document.cookie.split(";").forEach(c => {
+          const name = c.split("=")[0].trim();
+          if (name.startsWith("sb-")) document.cookie = `${name}=; Max-Age=0; path=/`;
+        });
+      } catch { /* ignore */ }
+      setSession(null); setUser(null); setLoading(false);
+      toast.error("Session expired, please sign in again");
+      if (window.location.pathname !== "/login") {
+        window.history.replaceState(null, "", "/login");
+        window.dispatchEvent(new PopStateEvent("popstate"));
       }
-      setLoading(false);
-    });
+    };
+
+    (async () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const oauthErr = params.get("error_description") || params.get("error") || hash.get("error_description") || hash.get("error");
+        if (oauthErr) throw new Error(oauthErr);
+
+        const { data: { session: s }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        setSession(s);
+        setUser(s?.user ?? null);
+        if (s?.user) {
+          loadSubscription(s.user.id);
+          loadProfile(s.user.id);
+        }
+        setLoading(false);
+      } catch (err) {
+        await failOAuth(err);
+      }
+    })();
 
     return () => sub.unsubscribe();
   }, []);
