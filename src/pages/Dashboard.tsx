@@ -24,7 +24,7 @@ export default function Dashboard() {
       const dow = new Date().getDay();
 
       const [{ data: s }, { data: hw }, { data: slots }, { data: sessions }, { data: exam }] = await Promise.all([
-        supabase.from("streaks").select("*").eq("user_id", user.id).maybeSingle(),
+        (supabase as any).from("user_streaks").select("*").eq("user_id", user.id).maybeSingle(),
         supabase.from("homework").select("*, subjects(name, color)").eq("user_id", user.id).eq("due_date", today).eq("completed", false),
         supabase.from("timetable_slots").select("*, subjects(name, color)").eq("user_id", user.id).eq("day_of_week", dow).order("start_time"),
         supabase.from("study_sessions").select("duration_minutes, completed_at").eq("user_id", user.id).gte("completed_at", startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString()).lte("completed_at", endOfWeek(new Date(), { weekStartsOn: 1 }).toISOString()),
@@ -50,7 +50,7 @@ export default function Dashboard() {
     const channel = supabase
       .channel(`dash-${user.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "study_sessions" }, () => load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "streaks", filter: `user_id=eq.${user.id}` }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_streaks", filter: `user_id=eq.${user.id}` }, () => load())
       .subscribe();
     // The DB trigger apply_session_streak() is the single source of truth.
     // On completion we simply re-read it (a few retries cover trigger latency).
