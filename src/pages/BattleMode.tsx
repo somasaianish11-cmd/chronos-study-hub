@@ -23,8 +23,8 @@ import { toast } from "sonner";
 
 type Duration = 15 | 25 | 45;
 type Mode = "bot" | "room";
-type Phase = "lobby" | "countdown" | "arena" | "result";
-type Outcome = "win" | "loss";
+type Phase = "lobby" | "countdown" | "arena" | "waiting" | "result";
+type Outcome = "win" | "loss" | "tie";
 
 const BOT_NAMES = ["Anish", "Mira", "Kenji", "Zara", "Leo", "Nova", "Rhea", "Kai"];
 
@@ -84,10 +84,9 @@ function BattleInner() {
         isHostRef.current = amHost;
         setIsHost(amHost);
       }
-      const next = Math.min(
-        1,
-        Number(amHost ? row.guest_progress : row.host_progress) || 0
-      );
+      // DB stores integer percentages 0..100 -> convert to 0..1
+      const raw = Number(amHost ? row.guest_progress : row.host_progress) || 0;
+      const next = Math.min(1, Math.max(0, raw / 100));
       console.log(`[Battle][${source}] row:`, row, "amHost:", amHost, "-> opponentProgress:", next);
       if (amHost) {
         if (row.guest_name) setOpponent(row.guest_name);
@@ -261,17 +260,36 @@ function BattleInner() {
       // Win by finishing the timer
       if (left <= 0) {
         clearInterval(id);
-        finish("win");
+        if (mode === "room") void reportFinalAndWait();
+        else finish("win");
       }
     }, 250);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // Room mode: loss when live opponent progress hits 1
+  // Room mode: write my final score (100) and wait for the opponent's.
+  const reportFinalAndWait = async () => {
+    if (quitRef.current || !roomId) return;
+    setSecondsLeft(0);
+    setPhase("waiting");
+    const patch = isHostRef.current ? { host_progress: 100 } : { guest_progress: 100 };
+    for (let i = 0; i < 3; i++) {
+      const { error } = await (supabase as any).from("battle_rooms").update(patch).eq("id", roomId);
+      if (!error) { console.log("[Battle][final] reported", patch); return; }
+      console.error("[Battle][final] report failed, retrying:", error.message);
+      await new Promise((res) => setTimeout(res, 1000));
+    }
+    toast.error("Couldn't report your final score — still retrying via sync.");
+  };
+
+  // Room mode: show results only once BOTH scores are confirmed in the DB.
   useEffect(() => {
-    if (phase !== "arena" || mode !== "room") return;
-    if (opponentProgress >= 1) finish("loss");
+    if (phase !== "waiting" || mode !== "room") return;
+    if (opponentProgress >= 1) {
+      (supabase as any).from("battle_rooms").update({ status: "finished" }).eq("id", roomId);
+      finish("tie");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opponentProgress, phase, mode]);
 
@@ -283,15 +301,15 @@ function BattleInner() {
     const earned = result === "win" ? duration * 10 : Math.floor(duration * 3);
     setXp(earned);
 
-    // Only log a study session on win — fairness for the leaderboard
-    if (result === "win" && user) {
+    // Log a study session when the full duel was completed (win or both finished)
+    if ((result === "win" || result === "tie") && user) {
       const { error } = await supabase.from("study_sessions").insert({
         user_id: user.id,
         duration_minutes: duration,
         completed_at: new Date().toISOString(),
       });
       if (error) toast.error("Couldn't save session: " + error.message);
-      else toast.success(`Victory! +${duration}m logged to leaderboard.`);
+      else toast.success(`${result === "tie" ? "Duel complete!" : "Victory!"} +${duration}m logged to leaderboard.`);
     }
   };
 
@@ -402,7 +420,7 @@ function BattleInner() {
       .maybeSingle();
     if (seed) {
       console.log("[Battle][join] initial row:", seed);
-      setOpponentProgress(Math.min(1, Number(seed.host_progress) || 0));
+      setOpponentProgress(Math.min(1, (Number(seed.host_progress) || 0) / 100));
     }
     setRoomId(data.id);
     setIsHost(false);
@@ -466,6 +484,19 @@ function BattleInner() {
         trash={trash}
         onSurrender={surrender}
       />
+    );
+  }
+
+  if (phase === "waiting") {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center gap-4">
+        <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+        <h2 className="text-2xl font-bold">Your timer is done!</h2>
+        <p className="text-muted-foreground">
+          Waiting for {opponent} to finish… ({Math.round(opponentProgress * 100)}%)
+        </p>
+        <Button variant="secondary" onClick={surrender}>Leave match</Button>
+      </div>
     );
   }
 
@@ -804,7 +835,8 @@ function ResultScreen({
   onPlayAgain: () => void;
   onLeaderboard: () => void;
 }) {
-  const win = outcome === "win";
+  const win = outcome === "win" || outcome === "tie";
+  const tie = outcome === "tie";
   return (
     <div className="max-w-xl mx-auto">
       <Card className="relative p-10 text-center bg-gradient-card border-border overflow-hidden">
@@ -825,10 +857,10 @@ function ResultScreen({
             )}
           </div>
           <div className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">
-            {win ? "Victory" : "Defeat"}
+            {tie ? "Tie — both finished" : win ? "Victory" : "Defeat"}
           </div>
           <h2 className="text-4xl font-bold mb-2">
-            {win ? "You out-focused them" : `${opponent} took this one`}
+            {tie ? `You and ${opponent} both made it` : win ? "You out-focused them" : `${opponent} took this one`}
           </h2>
           <p className="text-muted-foreground mb-8">
             {win

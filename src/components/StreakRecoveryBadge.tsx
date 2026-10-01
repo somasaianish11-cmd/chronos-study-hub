@@ -1,7 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { utcMondayOf } from "@/lib/streaks";
+import {
+  STREAK_TABLE,
+  UserStreak,
+  fetchUserStreak,
+  localDay,
+  missedDays,
+  sanitizeStreakPayload,
+  yesterdayOf,
+} from "@/lib/streaks";
 import { LifeBuoy, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -14,87 +22,58 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
-const dayStr = (d: Date) => {
-  const x = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return x.toISOString().slice(0, 10);
-};
-
-/** Pro streak recovery badge. Clickable when this week's recovery is still available. */
+/** Pro streak recovery badge. Clickable when a streak freeze is available. */
 export default function StreakRecoveryBadge({ className }: { className?: string }) {
   const { user, isPro, refreshProfile } = useAuth();
-  const [used, setUsed] = useState<boolean | null>(null);
+  const [row, setRow] = useState<UserStreak | null | undefined>(undefined);
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"restore" | "manual">("restore");
-  const [manualDays, setManualDays] = useState("1");
   const [claiming, setClaiming] = useState(false);
 
-  const fetchUsed = useCallback(() => {
+  const load = useCallback(async () => {
     if (!user || !isPro) return;
-    let active = true;
-    // select("*") so a missing optional column never 400s; null row = not used.
-    supabase
-      .from("streaks")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) { console.warn("[Streak] recovery fetch failed:", error.message); setUsed(false); return; }
-        setUsed((data as any)?.recovery_used_week === utcMondayOf(new Date()));
-      });
-    return () => { active = false; };
+    setRow(await fetchUserStreak(user.id));
   }, [user, isPro]);
 
   useEffect(() => {
-    const cleanup = fetchUsed();
-    const onComplete = () => fetchUsed();
+    load();
+    const onComplete = () => load();
     window.addEventListener("chronos:session-complete", onComplete);
-    return () => {
-      cleanup?.();
-      window.removeEventListener("chronos:session-complete", onComplete);
-    };
-  }, [fetchUsed]);
+    return () => window.removeEventListener("chronos:session-complete", onComplete);
+  }, [load]);
 
-  if (!isPro || used === null) return null;
+  if (!isPro || row === undefined) return null;
+
+  const freezes = row?.streak_freezes_available ?? 0;
+  const missing = missedDays(row?.last_active_date ?? null);
+  const available = freezes > 0;
 
   const claimRecovery = async () => {
-    if (!user || claiming) return;
-    const days = mode === "restore" ? 3 : Math.max(1, Math.min(30, parseInt(manualDays, 10) || 1));
+    if (!user || claiming || !row) return;
+    if (missing <= 0) {
+      toast.info("Your streak isn't broken — nothing to restore.");
+      return;
+    }
     setClaiming(true);
     try {
-      const { data: row, error: fetchErr } = await supabase
-        .from("streaks")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (fetchErr) throw fetchErr;
-
-      const today = dayStr(new Date());
-      const weekStart = utcMondayOf(new Date());
-      const current = Number((row as any)?.current_streak) || 0;
-      const longest = Number((row as any)?.longest_streak) || 0;
-      const newStreak = current + days;
-
-      const payload = {
+      const today = localDay();
+      const newStreak = row.current_streak + missing;
+      // Bridge the gap up to yesterday so studying today continues the chain.
+      const payload = sanitizeStreakPayload({
         current_streak: newStreak,
-        longest_streak: Math.max(newStreak, longest),
-        last_study_date: today,
-        recovery_used_week: weekStart,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error } = row
-        ? await supabase.from("streaks").update(payload).eq("user_id", user.id)
-        : await supabase.from("streaks").insert({ user_id: user.id, ...payload });
+        longest_streak: Math.max(newStreak, row.longest_streak),
+        last_active_date: yesterdayOf(today),
+        streak_freezes_available: Math.max(0, freezes - 1),
+        last_recovery_used_at: new Date().toISOString(),
+      });
+      const { error } = await (supabase as any)
+        .from(STREAK_TABLE)
+        .update(payload)
+        .eq("user_id", user.id);
       if (error) throw error;
 
-      setUsed(true);
       setOpen(false);
-      toast.success(`Streak recovered! +${days} day${days === 1 ? "" : "s"} restored 🔥`);
-      // Refresh dashboard state immediately.
+      toast.success(`Streak recovered! +${missing} day${missing === 1 ? "" : "s"} restored 🔥`);
       window.dispatchEvent(new Event("chronos:session-complete"));
       refreshProfile?.();
     } catch (e: any) {
@@ -109,20 +88,18 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
-        used
-          ? "border-border bg-muted text-muted-foreground"
-          : "border-primary/40 bg-primary/10 text-primary",
+        available
+          ? "border-primary/40 bg-primary/10 text-primary"
+          : "border-border bg-muted text-muted-foreground",
         className
       )}
     >
       <LifeBuoy className="w-3.5 h-3.5" />
-      {used ? "Recovery used this week" : "1/1 Streak Recovery available"}
+      {available ? `${freezes} Streak Recovery available` : "No recoveries left"}
     </span>
   );
 
-  if (used) {
-    return <span title="Pro members get one streak recovery per week, resetting Monday 00:00 UTC.">{badge}</span>;
-  }
+  if (!available || !row) return <span title="Pro members get streak recoveries to repair missed days.">{badge}</span>;
 
   return (
     <>
@@ -130,7 +107,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
         type="button"
         onClick={() => setOpen(true)}
         className="cursor-pointer transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full"
-        title="Claim your weekly streak recovery"
+        title="Claim a streak recovery"
       >
         {badge}
       </button>
@@ -142,62 +119,30 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
               <LifeBuoy className="w-5 h-5 text-primary" /> Streak Recovery
             </DialogTitle>
             <DialogDescription>
-              You have <span className="font-semibold text-foreground">1/1</span> recovery item available this week.
-              It resets Monday 00:00 UTC.
+              You have <span className="font-semibold text-foreground">{freezes}</span> recovery
+              item{freezes === 1 ? "" : "s"} available.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            <button
-              type="button"
-              onClick={() => setMode("restore")}
-              className={cn(
-                "w-full rounded-lg border p-3 text-left transition-colors",
-                mode === "restore" ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"
-              )}
-            >
-              <div className="flex items-center gap-2 font-medium">
-                <Flame className="w-4 h-4 text-primary" /> Restore Previous Streak (+3 Days)
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Add back the 3 days you lost when your streak broke.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setMode("manual")}
-              className={cn(
-                "w-full rounded-lg border p-3 text-left transition-colors",
-                mode === "manual" ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"
-              )}
-            >
-              <div className="font-medium">Manual adjustment</div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Missed a different number of days? Enter how many to restore.
-              </p>
-              {mode === "manual" && (
-                <div className="mt-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <Label htmlFor="manual-days" className="text-xs">Days:</Label>
-                  <Input
-                    id="manual-days"
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={manualDays}
-                    onChange={(e) => setManualDays(e.target.value)}
-                    className="h-8 w-20"
-                  />
-                </div>
-              )}
-            </button>
+          <div className="rounded-lg border border-border p-3 my-2">
+            <div className="flex items-center gap-2 font-medium">
+              <Flame className="w-4 h-4 text-primary" />
+              {missing > 0
+                ? `Restore ${missing} missed day${missing === 1 ? "" : "s"}`
+                : "No missed days"}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Last active: {row.last_active_date ?? "never"}. Current streak: {row.current_streak} day
+              {row.current_streak === 1 ? "" : "s"}
+              {missing > 0 && ` → ${row.current_streak + missing} after recovery`}.
+            </p>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={claiming}>
               Cancel
             </Button>
-            <Button onClick={claimRecovery} disabled={claiming}>
+            <Button onClick={claimRecovery} disabled={claiming || missing <= 0}>
               {claiming ? "Claiming…" : "Claim Recovery"}
             </Button>
           </DialogFooter>
