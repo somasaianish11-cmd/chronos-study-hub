@@ -1,103 +1,101 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const dayStr = (d: Date) => {
-  const x = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return x.toISOString().slice(0, 10);
+export const STREAK_TABLE = "user_streaks";
+
+export type UserStreak = {
+  user_id: string;
+  current_streak: number;
+  longest_streak: number;
+  last_active_date: string | null;
+  streak_freezes_available: number;
+  last_recovery_used_at: string | null;
 };
 
-const addDays = (iso: string, n: number) => {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + n);
-  return dayStr(d);
+const ALLOWED_KEYS: (keyof UserStreak)[] = [
+  "user_id",
+  "current_streak",
+  "longest_streak",
+  "last_active_date",
+  "streak_freezes_available",
+  "last_recovery_used_at",
+];
+
+/** Local calendar day as YYYY-MM-DD. */
+export const localDay = (d: Date = new Date()) => d.toLocaleDateString("en-CA");
+
+const isDay = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+const toInt = (v: unknown) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n >= 0 ? n : 0;
 };
 
-/** Monday (local) of the week containing `d`, as YYYY-MM-DD. */
-export const mondayOf = (d: Date) => {
-  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diff = (x.getDay() + 6) % 7; // 0 = Monday
-  x.setDate(x.getDate() - diff);
-  return dayStr(x);
-};
+/** Strip unknown keys and coerce types so Supabase never sees a schema mismatch (400). */
+export function sanitizeStreakPayload(input: Partial<Record<string, unknown>>): Partial<UserStreak> {
+  const out: Partial<UserStreak> = {};
+  for (const key of ALLOWED_KEYS) {
+    if (!(key in input) || input[key] === undefined) continue;
+    const v = input[key];
+    switch (key) {
+      case "user_id":
+        if (typeof v === "string" && v) out.user_id = v;
+        break;
+      case "current_streak":
+      case "longest_streak":
+      case "streak_freezes_available":
+        out[key] = toInt(v);
+        break;
+      case "last_active_date":
+        out.last_active_date = isDay(v) ? (v as string) : null;
+        break;
+      case "last_recovery_used_at": {
+        const d = v ? new Date(v as string) : null;
+        out.last_recovery_used_at = d && !isNaN(d.getTime()) ? d.toISOString() : null;
+        break;
+      }
+    }
+  }
+  return out;
+}
 
-/** Monday 00:00 UTC of the week containing `d`, as YYYY-MM-DD.
- *  Used for the Pro streak-recovery allowance, which resets weekly in UTC. */
-export const utcMondayOf = (d: Date) => {
-  const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const diff = (x.getUTCDay() + 6) % 7; // 0 = Monday
-  x.setUTCDate(x.getUTCDate() - diff);
-  return x.toISOString().slice(0, 10);
-};
-
-export type BumpResult = {
-  streak: number;
-  /** true when a Pro streak recovery was consumed to save the streak */
-  recovered: boolean;
-  /** true when today was the user's first session of the day */
-  firstToday: boolean;
-};
+/** Normalise a raw row (nulls / missing columns) into a safe UserStreak. */
+export function normalizeStreak(row: any, userId: string): UserStreak {
+  return {
+    user_id: userId,
+    current_streak: toInt(row?.current_streak),
+    longest_streak: toInt(row?.longest_streak),
+    last_active_date: isDay(row?.last_active_date) ? row.last_active_date : null,
+    streak_freezes_available: toInt(row?.streak_freezes_available),
+    last_recovery_used_at: row?.last_recovery_used_at ?? null,
+  };
+}
 
 /**
- * Increment the streak on the first completed session of the day.
- * Pro users get 1 streak recovery per week (resets every Monday): if they
- * missed exactly one day, the streak continues instead of resetting to 1.
+ * Days missed between the last active day and today (exclusive of both).
+ * last=yesterday or today -> 0. last=3 days ago -> 2 missed days.
  */
-export async function bumpStreak(userId: string, isPro = false): Promise<BumpResult> {
-  const today = dayStr(new Date());
-  const yesterday = addDays(today, -1);
-  const twoDaysAgo = addDays(today, -2);
-  const weekStart = utcMondayOf(new Date());
+export function missedDays(lastActive: string | null, today: string = localDay()): number {
+  if (!lastActive) return 0;
+  const a = new Date(lastActive + "T00:00:00").getTime();
+  const b = new Date(today + "T00:00:00").getTime();
+  const diff = Math.round((b - a) / 86400000);
+  return Math.max(0, diff - 1);
+}
 
-  const { data: row } = await supabase
-    .from("streaks")
+export const yesterdayOf = (today: string = localDay()) => {
+  const d = new Date(today + "T00:00:00");
+  d.setDate(d.getDate() - 1);
+  return localDay(d);
+};
+
+export async function fetchUserStreak(userId: string): Promise<UserStreak | null> {
+  const { data, error } = await (supabase as any)
+    .from(STREAK_TABLE)
     .select("*")
     .eq("user_id", userId)
     .maybeSingle();
-
-  if (!row) {
-    await supabase.from("streaks").insert({
-      user_id: userId,
-      current_streak: 1,
-      longest_streak: 1,
-      last_study_date: today,
-    });
-    return { streak: 1, recovered: false, firstToday: true };
+  if (error) {
+    console.warn("[Streak] fetch failed:", error.message);
+    return null;
   }
-
-  // Already studied today — streak unchanged.
-  if (row.last_study_date === today) {
-    return { streak: row.current_streak, recovered: false, firstToday: false };
-  }
-
-  let newStreak: number;
-  let recovered = false;
-  let recoveryWeek = row.recovery_used_week;
-
-  if (row.last_study_date === yesterday) {
-    newStreak = row.current_streak + 1;
-  } else if (
-    isPro &&
-    row.last_study_date === twoDaysAgo &&
-    row.recovery_used_week !== weekStart &&
-    row.current_streak > 0
-  ) {
-    // Missed exactly one day — spend this week's recovery to keep the chain.
-    newStreak = row.current_streak + 1;
-    recovered = true;
-    recoveryWeek = weekStart;
-  } else {
-    newStreak = 1;
-  }
-
-  await supabase
-    .from("streaks")
-    .update({
-      current_streak: newStreak,
-      longest_streak: Math.max(newStreak, row.longest_streak),
-      last_study_date: today,
-      recovery_used_week: recoveryWeek,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId);
-
-  return { streak: newStreak, recovered, firstToday: true };
+  return data ? normalizeStreak(data, userId) : null;
 }
