@@ -99,3 +99,35 @@ export async function fetchUserStreak(userId: string): Promise<UserStreak | null
   }
   return data ? normalizeStreak(data, userId) : null;
 }
+
+/**
+ * Post-session streak updater — single client-side writer for user_streaks.
+ * If last_active_date is not today, increments current_streak by 1 and sets
+ * last_active_date to today (local YYYY-MM-DD). Payload is sanitized before
+ * saving so no unknown keys reach Supabase (prevents 400 schema mismatches).
+ */
+export async function applySessionStreak(userId: string): Promise<void> {
+  const today = localDay();
+  const existing = await fetchUserStreak(userId);
+
+  if (existing?.last_active_date === today) return; // already counted today
+
+  const current = (existing?.current_streak ?? 0) + 1;
+  const longest = Math.max(existing?.longest_streak ?? 0, current);
+
+  const payload = sanitizeStreakPayload({
+    user_id: userId,
+    current_streak: current,
+    longest_streak: longest,
+    last_active_date: today,
+    streak_freezes_available: existing?.streak_freezes_available ?? 1,
+    last_recovery_used_at: existing?.last_recovery_used_at ?? null,
+  });
+
+  const { error } = await (supabase as any)
+    .from(STREAK_TABLE)
+    .upsert(payload, { onConflict: "user_id" });
+  if (error) {
+    console.warn("[Streak] update failed:", error.message);
+  }
+}

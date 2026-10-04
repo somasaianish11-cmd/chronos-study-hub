@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode, useC
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { applySessionStreak } from "@/lib/streaks";
 
 const STORAGE_KEY = "chronos.timer.v1";
 
@@ -104,8 +105,9 @@ export function TimerProvider({ children }: { children: ReactNode }) {
           toast.error("Couldn't save your session", { description: error.message });
           return;
         }
-        // Streaks are owned solely by the DB trigger apply_session_streak().
-        // Notify mounted views to re-read from the database (single source of truth).
+        // Update the streak in user_streaks (client-side single writer),
+        // then notify mounted views to re-read from the database.
+        await applySessionStreak(user.id);
         window.dispatchEvent(new CustomEvent("chronos:session-complete", { detail: { durationMin } }));
         // Refresh the user's profile so any UI derived from profiles stays current.
         await refreshProfile();
