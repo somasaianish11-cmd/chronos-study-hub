@@ -45,7 +45,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
   if (!isPro || row === undefined) return null;
 
   const freezes = row?.streak_freezes_available ?? 0;
-  const missing = missedDays(row?.last_active_date ?? null);
+  const missing = missedDays(row?.last_active_day ?? null);
   const available = freezes > 0;
 
   const claimRecovery = async () => {
@@ -62,7 +62,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       const payload = sanitizeStreakPayload({
         current_streak: newStreak,
         longest_streak: Math.max(newStreak, row.longest_streak),
-        last_active_date: yesterdayOf(today),
+        last_active_day: yesterdayOf(today),
         streak_freezes_available: Math.max(0, freezes - 1),
         last_recovery_used_at: new Date().toISOString(),
       });
@@ -132,7 +132,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
                 : "No missed days"}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Last active: {row.last_active_date ?? "never"}. Current streak: {row.current_streak} day
+              Last active: {row.last_active_day ?? "never"}. Current streak: {row.current_streak} day
               {row.current_streak === 1 ? "" : "s"}
               {missing > 0 && ` → ${row.current_streak + missing} after recovery`}.
             </p>
