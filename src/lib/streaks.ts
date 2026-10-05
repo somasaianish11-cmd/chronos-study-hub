@@ -107,6 +107,7 @@ export async function fetchUserStreak(userId: string): Promise<UserStreak | null
  * saving so no unknown keys reach Supabase (prevents 400 schema mismatches).
  */
 export async function applySessionStreak(userId: string): Promise<void> {
+  console.log('[Streak] Attempting update for user:', userId);
   const today = localDay();
   const existing = await fetchUserStreak(userId);
 

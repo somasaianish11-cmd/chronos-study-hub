@@ -101,13 +101,18 @@ export function TimerProvider({ children }: { children: ReactNode }) {
           .select()
           .maybeSingle();
         console.log("[Chronos] session insert", { data, error });
+        // Always update the streak when a session completes — even if the
+        // session row failed to save — so the streak handler never gets skipped.
+        try {
+          await applySessionStreak(user.id);
+        } catch (e) {
+          console.warn("[Streak] handler threw:", e);
+        }
         if (error) {
           toast.error("Couldn't save your session", { description: error.message });
+          window.dispatchEvent(new CustomEvent("chronos:session-complete", { detail: { durationMin } }));
           return;
         }
-        // Update the streak in user_streaks (client-side single writer),
-        // then notify mounted views to re-read from the database.
-        await applySessionStreak(user.id);
         window.dispatchEvent(new CustomEvent("chronos:session-complete", { detail: { durationMin } }));
         // Refresh the user's profile so any UI derived from profiles stays current.
         await refreshProfile();
