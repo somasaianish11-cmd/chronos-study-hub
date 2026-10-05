@@ -6,7 +6,7 @@ export type UserStreak = {
   user_id: string;
   current_streak: number;
   longest_streak: number;
-  last_active_date: string | null;
+  last_active_day: string | null;
   streak_freezes_available: number;
   last_recovery_used_at: string | null;
 };
@@ -15,7 +15,7 @@ const ALLOWED_KEYS: (keyof UserStreak)[] = [
   "user_id",
   "current_streak",
   "longest_streak",
-  "last_active_date",
+  "last_active_day",
   "streak_freezes_available",
   "last_recovery_used_at",
 ];
@@ -44,8 +44,8 @@ export function sanitizeStreakPayload(input: Partial<Record<string, unknown>>): 
       case "streak_freezes_available":
         out[key] = toInt(v);
         break;
-      case "last_active_date":
-        out.last_active_date = isDay(v) ? (v as string) : null;
+      case "last_active_day":
+        out.last_active_day = isDay(v) ? (v as string) : null;
         break;
       case "last_recovery_used_at": {
         const d = v ? new Date(v as string) : null;
@@ -63,7 +63,7 @@ export function normalizeStreak(row: any, userId: string): UserStreak {
     user_id: userId,
     current_streak: toInt(row?.current_streak),
     longest_streak: toInt(row?.longest_streak),
-    last_active_date: isDay(row?.last_active_date) ? row.last_active_date : null,
+    last_active_day: isDay(row?.last_active_day) ? row.last_active_day : null,
     streak_freezes_available: toInt(row?.streak_freezes_available),
     last_recovery_used_at: row?.last_recovery_used_at ?? null,
   };
@@ -102,8 +102,8 @@ export async function fetchUserStreak(userId: string): Promise<UserStreak | null
 
 /**
  * Post-session streak updater — single client-side writer for user_streaks.
- * If last_active_date is not today, increments current_streak by 1 and sets
- * last_active_date to today (local YYYY-MM-DD). Payload is sanitized before
+ * If last_active_day is not today, increments current_streak by 1 and sets
+ * last_active_day to today (local YYYY-MM-DD). Payload is sanitized before
  * saving so no unknown keys reach Supabase (prevents 400 schema mismatches).
  */
 export async function applySessionStreak(userId: string): Promise<void> {
@@ -111,7 +111,7 @@ export async function applySessionStreak(userId: string): Promise<void> {
   const today = localDay();
   const existing = await fetchUserStreak(userId);
 
-  if (existing?.last_active_date === today) return; // already counted today
+  if (existing?.last_active_day === today) return; // already counted today
 
   const current = (existing?.current_streak ?? 0) + 1;
   const longest = Math.max(existing?.longest_streak ?? 0, current);
@@ -120,7 +120,7 @@ export async function applySessionStreak(userId: string): Promise<void> {
     user_id: userId,
     current_streak: current,
     longest_streak: longest,
-    last_active_date: today,
+    last_active_day: today,
     streak_freezes_available: existing?.streak_freezes_available ?? 1,
     last_recovery_used_at: existing?.last_recovery_used_at ?? null,
   });
