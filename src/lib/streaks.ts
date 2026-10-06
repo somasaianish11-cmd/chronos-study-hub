@@ -2,22 +2,26 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const STREAK_TABLE = "user_streaks";
 
-export type UserStreak = {
+/**
+ * The only columns user_streaks has that we are allowed to write.
+ * Sending anything else (e.g. last_recovery_used_at, longest_streak) makes
+ * PostgREST fail with a 400 schema-cache error.
+ */
+export type StreakWrite = {
   user_id: string;
   current_streak: number;
-  longest_streak: number;
   last_active_day: string | null;
-  streak_freezes_available: number;
-  last_recovery_used_at: string | null;
+  freeze_count: number;
 };
 
-const ALLOWED_KEYS: (keyof UserStreak)[] = [
+/** Read shape. longest_streak is display-only and never sent back to the database. */
+export type UserStreak = StreakWrite & { longest_streak: number };
+
+const WRITE_KEYS: (keyof StreakWrite)[] = [
   "user_id",
   "current_streak",
-  "longest_streak",
   "last_active_day",
-  "streak_freezes_available",
-  "last_recovery_used_at",
+  "freeze_count",
 ];
 
 /** Local calendar day as YYYY-MM-DD. */
@@ -29,29 +33,26 @@ const toInt = (v: unknown) => {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 };
 
-/** Strip unknown keys and coerce types so Supabase never sees a schema mismatch (400). */
-export function sanitizeStreakPayload(input: Partial<Record<string, unknown>>): Partial<UserStreak> {
-  const out: Partial<UserStreak> = {};
-  for (const key of ALLOWED_KEYS) {
+/**
+ * Keep only the four columns user_streaks actually accepts and coerce their
+ * types, so an extra or mis-typed field can never trigger a 400 schema mismatch.
+ */
+export function sanitizeStreakPayload(input: Partial<Record<string, unknown>>): Partial<StreakWrite> {
+  const out: Partial<StreakWrite> = {};
+  for (const key of WRITE_KEYS) {
     if (!(key in input) || input[key] === undefined) continue;
     const v = input[key];
     switch (key) {
       case "user_id":
-        if (typeof v === "string" && v) out.user_id = v;
+        if (typeof v === "string" && v.trim()) out.user_id = v.trim();
         break;
       case "current_streak":
-      case "longest_streak":
-      case "streak_freezes_available":
+      case "freeze_count":
         out[key] = toInt(v);
         break;
       case "last_active_day":
         out.last_active_day = isDay(v) ? (v as string) : null;
         break;
-      case "last_recovery_used_at": {
-        const d = v ? new Date(v as string) : null;
-        out.last_recovery_used_at = d && !isNaN(d.getTime()) ? d.toISOString() : null;
-        break;
-      }
     }
   }
   return out;
@@ -59,13 +60,13 @@ export function sanitizeStreakPayload(input: Partial<Record<string, unknown>>): 
 
 /** Normalise a raw row (nulls / missing columns) into a safe UserStreak. */
 export function normalizeStreak(row: any, userId: string): UserStreak {
+  const current = toInt(row?.current_streak);
   return {
     user_id: userId,
-    current_streak: toInt(row?.current_streak),
-    longest_streak: toInt(row?.longest_streak),
+    current_streak: current,
+    longest_streak: toInt(row?.longest_streak) || current,
     last_active_day: isDay(row?.last_active_day) ? row.last_active_day : null,
-    streak_freezes_available: toInt(row?.streak_freezes_available),
-    last_recovery_used_at: row?.last_recovery_used_at ?? null,
+    freeze_count: toInt(row?.freeze_count ?? row?.streak_freezes_available),
   };
 }
 
@@ -103,8 +104,8 @@ export async function fetchUserStreak(userId: string): Promise<UserStreak | null
 /**
  * Post-session streak updater — single client-side writer for user_streaks.
  * If last_active_day is not today, increments current_streak by 1 and sets
- * last_active_day to today (local YYYY-MM-DD). Payload is sanitized before
- * saving so no unknown keys reach Supabase (prevents 400 schema mismatches).
+ * last_active_day to today (local YYYY-MM-DD). The payload is sanitized down to
+ * the four real columns before saving so no unknown key reaches Supabase.
  */
 export async function applySessionStreak(userId: string): Promise<void> {
   console.log('[Streak] Attempting update for user:', userId);
@@ -114,15 +115,12 @@ export async function applySessionStreak(userId: string): Promise<void> {
   if (existing?.last_active_day === today) return; // already counted today
 
   const current = (existing?.current_streak ?? 0) + 1;
-  const longest = Math.max(existing?.longest_streak ?? 0, current);
 
   const payload = sanitizeStreakPayload({
     user_id: userId,
     current_streak: current,
-    longest_streak: longest,
     last_active_day: today,
-    streak_freezes_available: existing?.streak_freezes_available ?? 1,
-    last_recovery_used_at: existing?.last_recovery_used_at ?? null,
+    freeze_count: existing?.freeze_count ?? 1,
   });
 
   const { error } = await (supabase as any)
