@@ -44,7 +44,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
 
   if (!isPro || row === undefined) return null;
 
-  const freezes = row?.streak_freezes_available ?? 0;
+  const freezes = row?.freeze_count ?? 0;
   const missing = missedDays(row?.last_active_day ?? null);
   const available = freezes > 0;
 
@@ -59,12 +59,11 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       const today = localDay();
       const newStreak = row.current_streak + missing;
       // Bridge the gap up to yesterday so studying today continues the chain.
+      // Only the four columns user_streaks has — nothing else may be sent.
       const payload = sanitizeStreakPayload({
         current_streak: newStreak,
-        longest_streak: Math.max(newStreak, row.longest_streak),
         last_active_day: yesterdayOf(today),
-        streak_freezes_available: Math.max(0, freezes - 1),
-        last_recovery_used_at: new Date().toISOString(),
+        freeze_count: Math.max(0, freezes - 1),
       });
       const { error } = await (supabase as any)
         .from(STREAK_TABLE)
