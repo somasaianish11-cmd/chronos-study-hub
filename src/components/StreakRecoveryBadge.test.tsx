@@ -62,12 +62,12 @@ describe("StreakRecoveryBadge claim", () => {
     expect(badge).toHaveTextContent("2 Streak Recovery available");
     await waitFor(() => expect(badge).toHaveTextContent("2 Streak Recovery available"));
 
-    await userEvent.click(badge);
+    fireEvent.click(badge);
     // Modal should offer the dynamically computed gap, never a hardcoded "+3 Days".
     expect(await screen.findByText(/Restore 3 missed days/i)).toBeInTheDocument();
     expect(screen.queryByText(/\+3 Days/i)).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /Claim Recovery/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Claim Recovery/i }));
 
     await waitFor(() => expect(calls.some((c) => c.op === "update")).toBe(true));
     const write = calls.find((c) => c.op === "update")!;
