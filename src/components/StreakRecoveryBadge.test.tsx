@@ -49,7 +49,7 @@ beforeEach(() => {
     current_streak: 2,
     longest_streak: 8,
     last_active_day: dayMinus(4), // 3 missed days
-    freeze_count: 2,
+    freeze_count: 5,
     last_recovery_used_at: "2026-01-01T00:00:00.000Z",
   };
 });
