@@ -54,16 +54,23 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       toast.info("Your streak isn't broken — nothing to restore.");
       return;
     }
+    if (freezes < missing) {
+      toast.error(`You need ${missing} recoveries to bridge ${missing} missed days, but only have ${freezes}.`);
+      return;
+    }
     setClaiming(true);
     try {
       const today = localDay();
+      // Actual continuous date count: the streak ran unbroken through
+      // last_active_day, so bridging the gap extends it by exactly the number
+      // of missed days — one freeze consumed per missed day.
       const newStreak = row.current_streak + missing;
       // Bridge the gap up to yesterday so studying today continues the chain.
       // Only the four columns user_streaks has — nothing else may be sent.
       const payload = sanitizeStreakPayload({
         current_streak: newStreak,
         last_active_day: yesterdayOf(today),
-        freeze_count: Math.max(0, freezes - 1),
+        freeze_count: Math.max(0, freezes - missing),
       });
       const { error } = await (supabase as any)
         .from(STREAK_TABLE)
@@ -72,7 +79,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       if (error) throw error;
 
       setOpen(false);
-      toast.success(`Streak recovered! +${missing} day${missing === 1 ? "" : "s"} restored 🔥`);
+      toast.success(`Streak recovered! ${missing} day${missing === 1 ? "" : "s"} restored — streak is now ${newStreak} 🔥`);
       window.dispatchEvent(new Event("chronos:session-complete"));
       refreshProfile?.();
     } catch (e: any) {

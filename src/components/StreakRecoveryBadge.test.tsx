@@ -49,7 +49,7 @@ beforeEach(() => {
     current_streak: 2,
     longest_streak: 8,
     last_active_day: dayMinus(4), // 3 missed days
-    freeze_count: 2,
+    freeze_count: 5,
     last_recovery_used_at: "2026-01-01T00:00:00.000Z",
   };
 });
@@ -59,8 +59,8 @@ describe("StreakRecoveryBadge claim", () => {
     render(<StreakRecoveryBadge />);
 
     const badge = await screen.findByRole("button", { name: /Streak Recovery available/i });
-    expect(badge).toHaveTextContent("2 Streak Recovery available");
-    await waitFor(() => expect(badge).toHaveTextContent("2 Streak Recovery available"));
+    expect(badge).toHaveTextContent("5 Streak Recovery available");
+    await waitFor(() => expect(badge).toHaveTextContent("5 Streak Recovery available"));
 
     fireEvent.click(badge);
     // Modal should offer the dynamically computed gap, never a hardcoded "+3 Days".
@@ -79,7 +79,7 @@ describe("StreakRecoveryBadge claim", () => {
     ]);
     expect(write.payload.current_streak).toBe(5); // 2 + 3 restored
     expect(write.payload.last_active_day).toBe(dayMinus(1));
-    expect(write.payload.freeze_count).toBe(1);
+    expect(write.payload.freeze_count).toBe(2); // 5 - 3 missed days
     expect(write.payload).not.toHaveProperty("last_recovery_used_at");
     expect(write.payload).not.toHaveProperty("longest_streak");
     expect(write.payload).not.toHaveProperty("streak_freezes_available");
