@@ -79,7 +79,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       if (error) throw error;
 
       setOpen(false);
-      toast.success(`Streak recovered! +${missing} day${missing === 1 ? "" : "s"} restored 🔥`);
+      toast.success(`Streak recovered! ${missing} day${missing === 1 ? "" : "s"} restored — streak is now ${newStreak} 🔥`);
       window.dispatchEvent(new Event("chronos:session-complete"));
       refreshProfile?.();
     } catch (e: any) {
