@@ -310,6 +310,30 @@ function BattleInner() {
       });
       if (error) toast.error("Couldn't save session: " + error.message);
       else toast.success(`${result === "tie" ? "Duel complete!" : "Victory!"} +${duration}m logged to leaderboard.`);
+
+      // Increment the user's focus-time totals on their profile.
+      try {
+        const { data: prof, error: profErr } = await supabase
+          .from("profiles")
+          .select("total_focus_time, weekly_focus_time")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profErr) {
+          console.warn("[Battle] profiles fetch failed:", profErr.message);
+        } else {
+          const p = (prof ?? {}) as { total_focus_time?: number; weekly_focus_time?: number };
+          const { error: updErr } = await supabase
+            .from("profiles")
+            .update({
+              total_focus_time: (p.total_focus_time ?? 0) + duration,
+              weekly_focus_time: (p.weekly_focus_time ?? 0) + duration,
+            } as any)
+            .eq("id", user.id);
+          if (updErr) console.warn("[Battle] profiles update failed:", updErr.message);
+        }
+      } catch (e) {
+        console.warn("[Battle] focus-time update threw:", e);
+      }
     }
   };
 
