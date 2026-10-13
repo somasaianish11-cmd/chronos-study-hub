@@ -122,6 +122,8 @@ export default function TimerPage() {
             </Button>
             <Button size="lg" variant="outline" onClick={reset}><RotateCcw className="w-4 h-4" /></Button>
           </div>
+
+          <UtcTrackingBadge />
         </div>
       </Card>
     </div>
