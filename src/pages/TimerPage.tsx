@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Play, Pause, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import UtcTrackingBadge from "@/components/timer/UtcTrackingBadge";
 
 const PRESETS = [
   { label: "25m", minutes: 25 },
