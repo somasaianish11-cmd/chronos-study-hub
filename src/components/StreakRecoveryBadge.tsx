@@ -54,23 +54,19 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       toast.info("Your streak isn't broken — nothing to restore.");
       return;
     }
-    if (freezes < missing) {
-      toast.error(`You need ${missing} recoveries to bridge ${missing} missed days, but only have ${freezes}.`);
-      return;
-    }
+    if (freezes <= 0) return;
     setClaiming(true);
     try {
-      const today = localDay();
-      // Actual continuous date count: the streak ran unbroken through
-      // last_active_day, so bridging the gap extends it by exactly the number
-      // of missed days — one freeze consumed per missed day.
-      const newStreak = row.current_streak + missing;
-      // Bridge the gap up to yesterday so studying today continues the chain.
-      // Only the four columns user_streaks has — nothing else may be sent.
+      // Partial recovery allowed: restore as many days as freezes cover.
+      const recoveredDays = Math.min(freezes, missing);
+      const newStreak = row.current_streak + recoveredDays;
+      // Shift last_active_day forward by the recovered days.
+      const shifted = new Date((row.last_active_day as string) + "T00:00:00");
+      shifted.setDate(shifted.getDate() + recoveredDays);
       const payload = sanitizeStreakPayload({
         current_streak: newStreak,
-        last_active_day: yesterdayOf(today),
-        freeze_count: Math.max(0, freezes - missing),
+        last_active_day: localDay(shifted),
+        freeze_count: Math.max(0, freezes - recoveredDays),
       });
       const { error } = await (supabase as any)
         .from(STREAK_TABLE)
@@ -79,7 +75,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       if (error) throw error;
 
       setOpen(false);
-      toast.success(`Streak recovered! ${missing} day${missing === 1 ? "" : "s"} restored — streak is now ${newStreak} 🔥`);
+      toast.success(`Streak recovered! ${recoveredDays} day${recoveredDays === 1 ? "" : "s"} restored — streak is now ${newStreak} 🔥`);
       window.dispatchEvent(new Event("chronos:session-complete"));
       refreshProfile?.();
     } catch (e: any) {
@@ -140,15 +136,21 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
             <p className="mt-1 text-xs text-muted-foreground">
               Last active: {row.last_active_day ?? "never"}. Current streak: {row.current_streak} day
               {row.current_streak === 1 ? "" : "s"}
-              {missing > 0 && ` → ${row.current_streak + missing} after recovery`}.
+              {missing > 0 && ` → ${row.current_streak + Math.min(freezes, missing)} after recovery`}.
             </p>
+            {missing > freezes && (
+              <p className="mt-2 text-xs text-foreground">
+                You have {freezes} recoveries available to cover {missing} missed days. Claiming will
+                restore {freezes} days of your streak.
+              </p>
+            )}
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={claiming}>
               Cancel
             </Button>
-            <Button onClick={claimRecovery} disabled={claiming || missing <= 0}>
+            <Button onClick={claimRecovery} disabled={claiming || missing <= 0 || freezes <= 0}>
               {claiming ? "Claiming…" : "Claim Recovery"}
             </Button>
           </DialogFooter>

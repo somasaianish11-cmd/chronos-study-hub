@@ -56,9 +56,10 @@ describe("applySessionStreak payload", () => {
     const write = calls.find((c) => c.op === "upsert");
     expect(write, "a streak write should have been attempted").toBeTruthy();
     expect(Object.keys(write!.payload).sort()).toEqual(WRITE_KEYS);
-    expect(write!.payload.current_streak).toBe(4);
+    // 3 missed days, 2 freezes: 3 + 2 recovered + 1 today
+    expect(write!.payload.current_streak).toBe(6);
     expect(write!.payload.last_active_day).toBe(localDay());
-    expect(write!.payload.freeze_count).toBe(2);
+    expect(write!.payload.freeze_count).toBe(0);
     expect(write!.payload).not.toHaveProperty("last_recovery_used_at");
     expect(write!.payload).not.toHaveProperty("longest_streak");
     expect(write!.payload).not.toHaveProperty("streak_freezes_available");

@@ -114,13 +114,27 @@ export async function applySessionStreak(userId: string): Promise<void> {
 
   if (existing?.last_active_day === today) return; // already counted today
 
-  const current = (existing?.current_streak ?? 0) + 1;
+  let base = existing?.current_streak ?? 0;
+  let freezes = existing?.freeze_count ?? 1;
+  const missed = missedDays(existing?.last_active_day ?? null, today);
+
+  if (missed > 0) {
+    if (freezes > 0) {
+      // Auto-consume available freezes to bridge as much of the gap as possible.
+      const used = Math.min(freezes, missed);
+      base += used;
+      freezes -= used;
+    } else {
+      // No freezes left: streak is broken, start fresh at Day 1.
+      base = 0;
+    }
+  }
 
   const payload = sanitizeStreakPayload({
     user_id: userId,
-    current_streak: current,
+    current_streak: base + 1,
     last_active_day: today,
-    freeze_count: existing?.freeze_count ?? 1,
+    freeze_count: freezes,
   });
 
   const { error } = await (supabase as any)
