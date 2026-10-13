@@ -13,6 +13,14 @@ const renderBadge = () =>
     </TooltipProvider>
   );
 
+// Radix renders the explanation twice (visible bubble + visually-hidden
+// role="tooltip" node for screen readers), so assert presence, not uniqueness.
+const expectExplanation = async () => {
+  await waitFor(() =>
+    expect(screen.getAllByText(TOOLTIP_TEXT).length).toBeGreaterThan(0)
+  );
+};
+
 describe("UtcTrackingBadge", () => {
   it("shows the micro-copy under the timer controls", () => {
     renderBadge();
@@ -21,15 +29,13 @@ describe("UtcTrackingBadge", () => {
 
   it("reveals the full explanation on focus", async () => {
     renderBadge();
-    const badge = screen.getByText("Background-safe UTC tracking enabled");
-    fireEvent.focus(badge);
-    await waitFor(() => expect(screen.getByText(TOOLTIP_TEXT)).toBeTruthy());
+    fireEvent.focus(screen.getByText("Background-safe UTC tracking enabled"));
+    await expectExplanation();
   });
 
   it("reveals the full explanation on hover", async () => {
     renderBadge();
-    const badge = screen.getByText("Background-safe UTC tracking enabled");
-    fireEvent.pointerMove(badge);
-    await waitFor(() => expect(screen.getByText(TOOLTIP_TEXT)).toBeTruthy());
+    fireEvent.pointerMove(screen.getByText("Background-safe UTC tracking enabled"));
+    await expectExplanation();
   });
 });
