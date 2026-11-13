@@ -16,4 +16,11 @@ describe("seven-day recovery reset", () => {
     expect(recoveryResetAt(null)).toBeNull();
     expect(recoveryResetAt("invalid")).toBeNull();
   });
+  it("falls back to updated_at when no recovery was ever used", () => {
+    expect(recoveryCountdown(null, Date.parse("2026-11-14T18:27:00Z"), "2026-11-13T18:27:00Z")).toBe("Resets in 6d 0h 0m 0s");
+  });
+  it("shows a plain weekly note when neither date exists", () => {
+    expect(recoveryCountdown(null, Date.parse("2026-11-14T18:27:00Z"), null)).toBe("Resets weekly");
+    expect(recoveryCountdown(null, Date.parse("2026-11-14T18:27:00Z"))).toBe("Resets weekly");
+  });
 });
