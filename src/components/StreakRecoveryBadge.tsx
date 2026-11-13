@@ -116,7 +116,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       >
         {badge}
       </Button>
-      {freezes === 0 && !loadError && <p className="text-xs text-muted-foreground" role="timer">{recoveryCountdown(lastUsed, now)}</p>}
+      {freezes === 0 && !loadError && <p className="text-xs text-muted-foreground" role="timer">{recoveryCountdown(lastUsed, now, row?.updated_at)}</p>}
       {loadError && <p className="text-xs text-destructive">Recovery unavailable. Please try again.</p>}
       <div className="text-xs">
         <h2 className="font-medium text-foreground">Past Recoveries</h2>

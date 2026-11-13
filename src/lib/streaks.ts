@@ -74,6 +74,7 @@ export function normalizeStreak(row: any, userId: string): UserStreak {
     freeze_count: toInt(row?.freeze_count ?? row?.streak_freezes_available),
     streak_freezes_available: row?.streak_freezes_available == null ? undefined : toInt(row.streak_freezes_available),
     last_recovery_used_at: typeof row?.last_recovery_used_at === "string" ? row.last_recovery_used_at : null,
+    updated_at: typeof row?.updated_at === "string" ? row.updated_at : null,
   };
 }
 
