@@ -1,8 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import {
-  STREAK_TABLE,
   UserStreak,
   fetchUserStreak,
   localDay,
@@ -155,7 +153,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
                 : "No missed days"}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              {row?.last_active_day ?? "never"}. Current streak: {row?.current_streak ?? 0} day
+              Last active: {row?.last_active_day ?? "never"}. Current streak: {row?.current_streak ?? 0} day
               {row?.current_streak === 1 ? "" : "s"}
               {missing > 0 && ` → ${(row?.current_streak ?? 0) + Math.min(freezes, missing)} after recovery`}.
             </p>
