@@ -16,9 +16,9 @@ export function recoveryResetAt(usedAt: string | null): number | null {
   return Number.isFinite(time) ? time + WEEK_MS : null;
 }
 
-export function recoveryCountdown(usedAt: string | null, now: number): string {
-  const reset = recoveryResetAt(usedAt);
-  if (reset === null) return "Reset time unavailable";
+export function recoveryCountdown(usedAt: string | null, now: number, fallbackAt?: string | null): string {
+  const reset = recoveryResetAt(usedAt) ?? recoveryResetAt(fallbackAt ?? null);
+  if (reset === null) return "Resets weekly";
   const remaining = Math.max(0, Math.ceil((reset - now) / 1000));
   if (remaining === 0) return "Weekly reset due";
   const days = Math.floor(remaining / 86400);

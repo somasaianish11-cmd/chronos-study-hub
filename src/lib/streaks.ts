@@ -19,6 +19,7 @@ export type UserStreak = StreakWrite & {
   longest_streak: number;
   streak_freezes_available?: number;
   last_recovery_used_at?: string | null;
+  updated_at?: string | null;
 };
 
 const WRITE_KEYS: (keyof StreakWrite)[] = [
