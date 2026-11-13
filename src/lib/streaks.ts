@@ -15,7 +15,11 @@ export type StreakWrite = {
 };
 
 /** Read shape. longest_streak is display-only and never sent back to the database. */
-export type UserStreak = StreakWrite & { longest_streak: number };
+export type UserStreak = StreakWrite & {
+  longest_streak: number;
+  streak_freezes_available?: number;
+  last_recovery_used_at?: string | null;
+};
 
 const WRITE_KEYS: (keyof StreakWrite)[] = [
   "user_id",
@@ -67,6 +71,8 @@ export function normalizeStreak(row: any, userId: string): UserStreak {
     longest_streak: toInt(row?.longest_streak) || current,
     last_active_day: isDay(row?.last_active_day) ? row.last_active_day : null,
     freeze_count: toInt(row?.freeze_count ?? row?.streak_freezes_available),
+    streak_freezes_available: row?.streak_freezes_available == null ? undefined : toInt(row.streak_freezes_available),
+    last_recovery_used_at: typeof row?.last_recovery_used_at === "string" ? row.last_recovery_used_at : null,
   };
 }
 
