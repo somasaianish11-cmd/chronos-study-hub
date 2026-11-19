@@ -6,7 +6,7 @@ import {
   localDay,
   missedDays,
 } from "@/lib/streaks";
-import { claimLoggedRecovery, fetchRecoveryLogs, RecoveryLog, recoveryCountdown } from "@/lib/streakRecovery";
+import { claimLoggedRecovery, fetchRecoveryLogs, RecoveryLog, recoveryCountdown, refillExpiredRecovery } from "@/lib/streakRecovery";
 import { LifeBuoy, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -34,7 +34,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
   const load = useCallback(async () => {
     if (!user || !isPro) return;
     const streak = await fetchUserStreak(user.id);
-    setRow(streak);
+    setRow(streak ? await refillExpiredRecovery(user.id, streak) : streak);
     setLoadError(!streak);
     try {
       setLogs(await fetchRecoveryLogs(user.id));

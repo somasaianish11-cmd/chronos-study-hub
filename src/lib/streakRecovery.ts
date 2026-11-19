@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { fetchUserStreak, normalizeStreak, UserStreak } from "@/lib/streaks";
 
 export interface RecoveryLog {
   id: string;
@@ -14,6 +15,27 @@ export function recoveryResetAt(usedAt: string | null): number | null {
   if (!usedAt) return null;
   const time = Date.parse(usedAt);
   return Number.isFinite(time) ? time + WEEK_MS : null;
+}
+
+/** Refill only an expired, still-empty balance; concurrent loads cannot refill twice. */
+export async function refillExpiredRecovery(userId: string, streak: UserStreak): Promise<UserStreak> {
+  const now = Date.now();
+  const resetAt = recoveryResetAt(streak.updated_at ?? null);
+  if (streak.freeze_count !== 0 || resetAt === null || now < resetAt) return streak;
+
+  const { data, error } = await (supabase as any)
+    .from("user_streaks")
+    .update({ freeze_count: 1, streak_freezes_available: 1, updated_at: new Date(now).toISOString() })
+    .eq("user_id", userId)
+    .eq("freeze_count", 0)
+    .eq("updated_at", streak.updated_at)
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    console.warn("[Streak] recovery refill failed:", error.message);
+    return streak;
+  }
+  return data ? normalizeStreak(data, userId) : (await fetchUserStreak(userId)) ?? streak;
 }
 
 export function recoveryCountdown(usedAt: string | null, now: number, fallbackAt?: string | null): string {
