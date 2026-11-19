@@ -2,11 +2,38 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Flame, BookOpen, Trophy, Calendar, Timer as TimerIcon, GraduationCap } from "lucide-react";
+import { Flame, BookOpen, Trophy, Calendar, Timer as TimerIcon, GraduationCap, Check, Undo2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import StreakRecoveryBadge from "@/components/StreakRecoveryBadge";
+
+// Today-only dismissal for the dashboard timetable widget.
+// Keyed by the local calendar day, so a new day automatically starts clean.
+const DISMISS_PREFIX = "chronos:timetable-dismissed:";
+
+const localDayKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const readDismissed = (): string[] => {
+  try {
+    const raw = window.localStorage.getItem(DISMISS_PREFIX + localDayKey());
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeDismissed = (ids: string[]) => {
+  try {
+    window.localStorage.setItem(DISMISS_PREFIX + localDayKey(), JSON.stringify(ids));
+  } catch {
+    // Storage unavailable (private mode / quota): dismissal simply won't persist.
+  }
+};
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -16,6 +43,8 @@ export default function Dashboard() {
   const [weekMinutes, setWeekMinutes] = useState(0);
   const [leaders, setLeaders] = useState<any[]>([]);
   const [nextExam, setNextExam] = useState<any>(null);
+  const [dismissed, setDismissed] = useState<string[]>(() => readDismissed());
+  const [showCleared, setShowCleared] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -34,6 +63,8 @@ export default function Dashboard() {
       setStreak(Number((s as any)?.current_streak) || 0);
       setTodayHw(hw || []);
       setTodaySlots(slots || []);
+      // Re-read each load so the list clears itself when the local day rolls over.
+      setDismissed(readDismissed());
       setWeekMinutes((sessions || []).reduce((sum, x: any) => sum + x.duration_minutes, 0));
       setNextExam(exam);
 
@@ -71,6 +102,21 @@ export default function Dashboard() {
   const daysUntilExam = nextExam ? Math.ceil((new Date(nextExam.exam_date + "T00:00:00").getTime() - new Date(new Date().setHours(0, 0, 0, 0)).getTime()) / 86400000) : 0;
   const maxMin = Math.max(...leaders.map(l => l.minutes), 1);
 
+  const dismissSlot = (id: string) => {
+    const next = Array.from(new Set([...dismissed, id]));
+    writeDismissed(next);
+    setDismissed(next);
+  };
+
+  const restoreSlot = (id: string) => {
+    const next = dismissed.filter(x => x !== id);
+    writeDismissed(next);
+    setDismissed(next);
+  };
+
+  const visibleSlots = todaySlots.filter(s => !dismissed.includes(s.id));
+  const clearedSlots = todaySlots.filter(s => dismissed.includes(s.id));
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -92,19 +138,57 @@ export default function Dashboard() {
         <Card className="p-5 lg:col-span-2 bg-gradient-card border-border">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-primary" /><h2 className="font-semibold">Today's timetable</h2></div>
-            <Link to="/timetable"><Button variant="ghost" size="sm">Edit</Button></Link>
+            <div className="flex items-center gap-1">
+              {clearedSlots.length > 0 && visibleSlots.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={() => setShowCleared(v => !v)}>
+                  {showCleared ? "Hide cleared" : `Show cleared (${clearedSlots.length})`}
+                </Button>
+              )}
+              <Link to="/timetable"><Button variant="ghost" size="sm">Edit</Button></Link>
+            </div>
           </div>
           {todaySlots.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">No classes scheduled today.</p>
+          ) : visibleSlots.length === 0 && !showCleared ? (
+            <div className="py-6 text-center">
+              <p className="text-sm text-muted-foreground">All done for today 🎉</p>
+              <button onClick={() => setShowCleared(true)} className="mt-2 text-xs text-primary hover:underline">
+                Show cleared ({clearedSlots.length})
+              </button>
+            </div>
           ) : (
             <div className="space-y-2">
-              {todaySlots.map(s => (
+              {visibleSlots.map(s => (
                 <div key={s.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/40">
                   <div className="w-1 h-10 rounded-full" style={{ background: s.subjects?.color || "#7c6ff7" }} />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">{s.subjects?.name || "Subject"}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{s.subjects?.name || "Subject"}</div>
                     <div className="text-xs text-muted-foreground">{s.start_time?.slice(0, 5)} – {s.end_time?.slice(0, 5)}</div>
                   </div>
+                  <button
+                    onClick={() => dismissSlot(s.id)}
+                    title="Done for today"
+                    aria-label={`Mark ${s.subjects?.name || "class"} as done for today`}
+                    className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-accent/10 hover:text-accent"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              {showCleared && clearedSlots.map(s => (
+                <div key={s.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/20 opacity-70">
+                  <div className="w-1 h-10 rounded-full" style={{ background: s.subjects?.color || "#7c6ff7" }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate line-through">{s.subjects?.name || "Subject"}</div>
+                    <div className="text-xs text-muted-foreground">{s.start_time?.slice(0, 5)} – {s.end_time?.slice(0, 5)}</div>
+                  </div>
+                  <button
+                    onClick={() => restoreSlot(s.id)}
+                    aria-label={`Show ${s.subjects?.name || "class"} again today`}
+                    className="shrink-0 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Undo2 className="w-3 h-3" /> Undo
+                  </button>
                 </div>
               ))}
             </div>
