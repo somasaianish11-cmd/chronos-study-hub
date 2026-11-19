@@ -6,7 +6,7 @@ import {
   localDay,
   missedDays,
 } from "@/lib/streaks";
-import { claimLoggedRecovery, fetchRecoveryLogs, RecoveryLog, recoveryCountdown, refillExpiredRecovery } from "@/lib/streakRecovery";
+import { claimUnlimitedRecovery, claimLoggedRecovery, fetchRecoveryLogs, RecoveryLog, recoveryCountdown, refillExpiredRecovery } from "@/lib/streakRecovery";
 import { LifeBuoy, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -34,7 +34,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
   const load = useCallback(async () => {
     if (!user || !isPro) return;
     const streak = await fetchUserStreak(user.id);
-    setRow(streak ? await refillExpiredRecovery(user.id, streak) : streak);
+    setRow(streak ? (isPro ? streak : await refillExpiredRecovery(user.id, streak)) : streak);
     setLoadError(!streak);
     try {
       setLogs(await fetchRecoveryLogs(user.id));
@@ -62,7 +62,8 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
   const freezes = row?.streak_freezes_available ?? row?.freeze_count ?? 0;
   const lastUsed = row?.last_recovery_used_at ?? logs[0]?.used_at ?? null;
   const missing = missedDays(row?.last_active_day ?? null);
-  const available = freezes > 0;
+  const unlimited = isPro;
+  const available = unlimited || freezes > 0;
 
   const claimRecovery = async () => {
     if (!user || claiming || !row) return;
@@ -70,10 +71,10 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       toast.info("Your streak isn't broken — nothing to restore.");
       return;
     }
-    if (freezes <= 0) return;
+    if (!unlimited && freezes <= 0) return;
     setClaiming(true);
     try {
-      const result = await claimLoggedRecovery(localDay());
+      const result = unlimited ? await claimUnlimitedRecovery(user.id, row, localDay()) : await claimLoggedRecovery(localDay());
       await load();
 
       setOpen(false);
@@ -99,7 +100,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       )}
     >
       <LifeBuoy className="w-3.5 h-3.5" />
-      {available ? `${freezes} Streak Recovery available` : "0 recoveries available"}
+      {unlimited ? "Unlimited recoveries" : available ? `${freezes} Streak Recovery available` : "0 recoveries available"}
     </span>
   );
 
@@ -116,7 +117,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
       >
         {badge}
       </Button>
-      {freezes === 0 && !loadError && <p className="text-xs text-muted-foreground" role="timer">{recoveryCountdown(lastUsed, now, row?.updated_at)}</p>}
+      {!unlimited && freezes === 0 && !loadError && <p className="text-xs text-muted-foreground" role="timer">{recoveryCountdown(lastUsed, now, row?.updated_at)}</p>}
       {loadError && <p className="text-xs text-destructive">Recovery unavailable. Please try again.</p>}
       <div className="text-xs">
         <h2 className="font-medium text-foreground">Past Recoveries</h2>
@@ -140,8 +141,8 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
               <LifeBuoy className="w-5 h-5 text-primary" /> Streak Recovery
             </DialogTitle>
             <DialogDescription>
-              You have <span className="font-semibold text-foreground">{freezes}</span> recovery
-              item{freezes === 1 ? "" : "s"} available.
+              {unlimited ? "Unlimited recoveries with Pro." : <>You have <span className="font-semibold text-foreground">{freezes}</span> recovery
+              item{freezes === 1 ? "" : "s"} available.</>}
             </DialogDescription>
           </DialogHeader>
 
@@ -155,9 +156,9 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
             <p className="mt-1 text-xs text-muted-foreground">
               Last active: {row?.last_active_day ?? "never"}. Current streak: {row?.current_streak ?? 0} day
               {row?.current_streak === 1 ? "" : "s"}
-              {missing > 0 && ` → ${(row?.current_streak ?? 0) + Math.min(freezes, missing)} after recovery`}.
+              {missing > 0 && ` → ${(row?.current_streak ?? 0) + (unlimited ? missing : Math.min(freezes, missing))} after recovery`}.
             </p>
-            {missing > freezes && (
+            {!unlimited && missing > freezes && (
               <p className="mt-2 text-xs text-foreground">
                 You have {freezes} recoveries available to cover {missing} missed days. Claiming will
                 restore {freezes} days of your streak.
@@ -169,7 +170,7 @@ export default function StreakRecoveryBadge({ className }: { className?: string 
             <Button variant="outline" onClick={() => setOpen(false)} disabled={claiming}>
               Cancel
             </Button>
-            <Button onClick={claimRecovery} disabled={claiming || missing <= 0 || freezes <= 0}>
+            <Button onClick={claimRecovery} disabled={claiming || missing <= 0 || (!unlimited && freezes <= 0)}>
               {claiming ? "Claiming…" : "Claim Recovery"}
             </Button>
           </DialogFooter>

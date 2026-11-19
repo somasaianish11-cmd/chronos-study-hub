@@ -67,3 +67,16 @@ export async function claimLoggedRecovery(today: string): Promise<{ days_restore
   if (!result) throw new Error("Recovery returned no result");
   return result;
 }
+/** Pro: restore every missed day without touching freeze_count or any cooldown. */
+export async function claimUnlimitedRecovery(userId: string, streak: UserStreak, today: string): Promise<{ days_restored: number; current_streak: number }> {
+  const { missedDays, sanitizeStreakPayload, yesterdayOf, STREAK_TABLE } = await import("@/lib/streaks");
+  const missing = missedDays(streak.last_active_day ?? null, today);
+  if (missing <= 0) throw new Error("Nothing to restore");
+  const current_streak = (streak.current_streak ?? 0) + missing;
+  const payload = sanitizeStreakPayload({ user_id: userId, current_streak, last_active_day: yesterdayOf(today), freeze_count: streak.freeze_count });
+  const { error } = await (supabase as any).from(STREAK_TABLE).update(payload).eq("user_id", userId);
+  if (error) throw error;
+  const { error: logError } = await (supabase as any).from("streak_recovery_logs").insert({ user_id: userId, recovered_date: yesterdayOf(today), days_restored: missing, used_at: new Date().toISOString() });
+  if (logError) console.warn("[Streak] recovery log failed:", logError.message);
+  return { days_restored: missing, current_streak };
+}
